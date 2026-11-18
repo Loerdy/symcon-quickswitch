@@ -21,57 +21,39 @@
 
     .grid {
         display: grid;
-        /* Spalten, Zeilen und Kantenlänge setzt layoutGrid(); minmax(0, …) verhindert, dass Inhalte das Raster sprengen. */
-        grid-template-columns: repeat(var(--columns, 1), minmax(0, 1fr));
-        grid-template-rows: repeat(var(--rows, 1), minmax(0, 1fr));
+        /* Spalten, Zeilen, Kantenlänge und Beschriftungshöhe setzt layoutGrid(). Der Block aus Schaltflächen
+           wird als Ganzes zentriert, damit freier Platz nicht zwischen den Zeilen entsteht. */
+        grid-template-columns: repeat(var(--columns, 1), var(--size, 64px));
+        grid-auto-rows: auto;
+        justify-content: center;
+        align-content: center;
         gap: var(--gap, 8px);
         width: 100%;
         height: 100%;
     }
 
+    /* Schaltfläche = Quadrat mit Grafik, darunter die Beschriftung */
     .switch {
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
-        align-self: center;
-        justify-self: center;
-        gap: calc(var(--size, 64px) * 0.06);
-        width: var(--size, 100%);
-        height: var(--size, 100%);
+        gap: var(--label-gap, 4px);
+        width: var(--size, 64px);
         min-width: 0;
-        min-height: 0;
-        overflow: hidden;
-        padding: calc(var(--size, 64px) * 0.08);
+        padding: 0;
         border: 0;
-        border-radius: calc(var(--size, 64px) * 0.14);
-        background: color-mix(in srgb, var(--content-color, CanvasText) 6%, transparent);
+        background: none;
         color: inherit;
         font: inherit;
         cursor: pointer;
         -webkit-tap-highlight-color: transparent;
-        transition: background-color 0.15s ease, transform 0.1s ease;
-    }
-
-    .switch:hover {
-        background: color-mix(in srgb, var(--content-color, CanvasText) 10%, transparent);
-    }
-
-    /* Aktive Aktoren: Schaltfläche etwas heller hinterlegt */
-    .switch[data-on="true"] {
-        background: color-mix(in srgb, var(--content-color, CanvasText) 14%, transparent);
-    }
-
-    .switch[data-on="true"]:hover {
-        background: color-mix(in srgb, var(--content-color, CanvasText) 18%, transparent);
-    }
-
-    .switch:active,
-    .switch[data-pressed="true"] {
-        transform: scale(0.95);
     }
 
     .switch:focus-visible {
+        outline: none;
+    }
+
+    .switch:focus-visible .face {
         outline: 2px solid var(--accent-color, currentColor);
         outline-offset: -2px;
     }
@@ -79,25 +61,55 @@
     .switch:disabled {
         cursor: default;
         opacity: 0.4;
+    }
+
+    .face {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        width: var(--size, 64px);
+        height: var(--size, 64px);
+        overflow: hidden;
+        padding: calc(var(--size, 64px) * 0.1);
+        border-radius: calc(var(--size, 64px) * 0.16);
+        background: color-mix(in srgb, var(--content-color, CanvasText) 6%, transparent);
+        transition: background-color 0.15s ease, transform 0.1s ease;
+    }
+
+    .switch:hover .face {
+        background: color-mix(in srgb, var(--content-color, CanvasText) 10%, transparent);
+    }
+
+    /* Aktive Aktoren: Schaltfläche etwas heller hinterlegt */
+    .switch[data-on="true"] .face {
+        background: color-mix(in srgb, var(--content-color, CanvasText) 14%, transparent);
+    }
+
+    .switch[data-on="true"]:hover .face {
+        background: color-mix(in srgb, var(--content-color, CanvasText) 18%, transparent);
+    }
+
+    .switch:active .face,
+    .switch[data-pressed="true"] .face {
+        transform: scale(0.95);
+    }
+
+    .switch:disabled .face {
         transform: none;
     }
 
-    /* Bereich für Icon bzw. Bild; nimmt den Platz über der Beschriftung ein. */
+    /* Bereich für Icon bzw. Bild innerhalb des Quadrats */
     .graphic {
-        flex: 1 1 0;
         display: flex;
         align-items: center;
         justify-content: center;
         width: 100%;
-        min-height: 0;
+        height: 100%;
         line-height: 1;
         /* icons.js ersetzt das <i> durch ein SVG mit 1em Höhe; die Schriftgröße skaliert damit das Icon. */
-        font-size: calc(var(--size, 64px) * var(--icon-scale, 0.5));
+        font-size: calc(var(--size, 64px) * 0.58);
         transition: color 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
-    }
-
-    .switch[data-label="false"] .graphic {
-        --icon-scale: 0.62;
     }
 
     .graphic img {
@@ -129,9 +141,10 @@
     .label {
         flex: 0 0 auto;
         width: 100%;
+        height: var(--label-height, 1.2em);
         overflow: hidden;
-        font-size: clamp(10px, calc(var(--size, 64px) * 0.13), calc(var(--font-size, 14px) * 1.2));
-        line-height: 1.2;
+        font-size: var(--label-size, 12px);
+        line-height: var(--label-height, 1.2em);
         text-align: center;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -167,24 +180,46 @@
         return typeof value === "string" && value.startsWith("data:image/");
     }
 
-    // Wählt die Spaltenzahl, bei der die quadratischen Buttons am größten werden.
+    // Maße der Beschriftung unter dem Quadrat; wächst mit der Schaltfläche, höchstens etwas über die Designschrift.
+    function labelMetrics(size, withLabels) {
+        if (!withLabels) {
+            return { fontSize: 0, height: 0, gap: 0 };
+        }
+        const base = parseFloat(getComputedStyle(document.body).fontSize) || 14;
+        const fontSize = Math.max(10, Math.min(size * 0.14, base * 1.15));
+        return { fontSize, height: Math.ceil(fontSize * 1.25), gap: Math.max(2, Math.round(size * 0.05)) };
+    }
+
+    // Wählt die Spaltenzahl, bei der die quadratischen Schaltflächen (inkl. Beschriftung darunter) am größten werden.
     function layoutGrid() {
         const count = Math.max(1, Number(grid.dataset.count) || 1);
+        const withLabels = grid.dataset.labels === "true";
         const width = grid.clientWidth;
         const height = grid.clientHeight;
         const gap = Math.max(6, Math.min(14, Math.min(width, height) * 0.03 + 2));
-        let best = { columns: 1, rows: count, size: -1 };
+        let best = { columns: 1, size: -1 };
         for (let columns = 1; columns <= count; columns++) {
             const rows = Math.ceil(count / columns);
-            const size = Math.min((width - (columns - 1) * gap) / columns, (height - (rows - 1) * gap) / rows);
+            const cellHeight = (height - (rows - 1) * gap) / rows;
+            let size = Math.min((width - (columns - 1) * gap) / columns, cellHeight);
+            // Die Beschriftungshöhe hängt von der Größe ab; wenige Schritte genügen zur Annäherung.
+            for (let i = 0; i < 4; i++) {
+                const label = labelMetrics(size, withLabels);
+                size = Math.min((width - (columns - 1) * gap) / columns, cellHeight - label.height - label.gap);
+            }
             if (size > best.size) {
-                best = { columns, rows, size };
+                best = { columns, size };
             }
         }
+        // 1 px Reserve gegen Rundung der Beschriftungshöhe
+        const size = Math.max(0, Math.floor(best.size) - 1);
+        const label = labelMetrics(size, withLabels);
         grid.style.setProperty("--gap", gap + "px");
         grid.style.setProperty("--columns", String(best.columns));
-        grid.style.setProperty("--rows", String(best.rows));
-        grid.style.setProperty("--size", Math.max(0, Math.floor(best.size)) + "px");
+        grid.style.setProperty("--size", size + "px");
+        grid.style.setProperty("--label-size", label.fontSize + "px");
+        grid.style.setProperty("--label-height", label.height + "px");
+        grid.style.setProperty("--label-gap", label.gap + "px");
     }
 
     function iconElement(name) {
@@ -198,9 +233,12 @@
         const button = document.createElement("button");
         button.type = "button";
         button.className = "switch";
+        const face = document.createElement("span");
+        face.className = "face";
         const graphic = document.createElement("span");
         graphic.className = "graphic";
-        button.append(graphic);
+        face.append(graphic);
+        button.append(face);
         if (showLabel) {
             const label = document.createElement("span");
             label.className = "label";
@@ -274,6 +312,8 @@
         buttonsById = new Map();
         allButton = null;
         grid.dataset.count = String(entries.length + (showAll ? 1 : 0));
+        // Platz für Beschriftungen nur reservieren, wenn mindestens eine angezeigt wird (Alle an/aus hat immer eine).
+        grid.dataset.labels = String(showAll || entries.some((entry) => entry.showLabel !== false));
         layoutGrid();
 
         if (entries.length === 0) {
