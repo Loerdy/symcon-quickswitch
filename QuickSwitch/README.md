@@ -27,7 +27,7 @@ Kachel für die Kachel-Visualisierung von IP-Symcon, über die verknüpfte Aktor
 
 ### 2. Voraussetzungen
 
-- IP-Symcon ab Version 8.2
+- IP-Symcon ab Version 9.1
 - Kachel-Visualisierung
 
 ### 3. Software-Installation

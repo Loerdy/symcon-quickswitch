@@ -10,7 +10,7 @@ IP-Symcon-Library **QuickSwitch**: Kachel für die Kachel-Visualisierung, in der
 
 ## Voraussetzungen
 
-- IP-Symcon ab Version 8.2
+- IP-Symcon ab Version 9.1
 
 Das Modul ist auf Deutsch und Englisch verfügbar (Sprache der Konsole bzw. Visualisierung).
 

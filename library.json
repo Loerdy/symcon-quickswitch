@@ -4,7 +4,7 @@
     "name": "QuickSwitch",
     "url": "https://github.com/Loerdy/symcon-quickswitch",
     "compatibility": {
-        "version": "8.2"
+        "version": "9.1"
     },
     "version": "1.0",
     "build": 0,
