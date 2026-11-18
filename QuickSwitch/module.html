@@ -54,7 +54,16 @@
     }
 
     .switch:hover {
-        background: color-mix(in srgb, var(--content-color, CanvasText) 12%, transparent);
+        background: color-mix(in srgb, var(--content-color, CanvasText) 10%, transparent);
+    }
+
+    /* Aktive Aktoren: Schaltfläche etwas heller hinterlegt */
+    .switch[data-on="true"] {
+        background: color-mix(in srgb, var(--content-color, CanvasText) 14%, transparent);
+    }
+
+    .switch[data-on="true"]:hover {
+        background: color-mix(in srgb, var(--content-color, CanvasText) 18%, transparent);
     }
 
     .switch:active,
@@ -163,7 +172,7 @@
         const count = Math.max(1, Number(grid.dataset.count) || 1);
         const width = grid.clientWidth;
         const height = grid.clientHeight;
-        const gap = Math.max(4, Math.min(12, Math.min(width, height) * 0.03));
+        const gap = Math.max(6, Math.min(14, Math.min(width, height) * 0.03 + 2));
         let best = { columns: 1, rows: count, size: -1 };
         for (let columns = 1; columns <= count; columns++) {
             const rows = Math.ceil(count / columns);
