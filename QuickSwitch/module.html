@@ -1,0 +1,362 @@
+<script src="/icons.js"></script>
+<style>
+    /* Abstände und Schrift setzt die Visualisierung am body, deshalb body-Margins nicht überschreiben.
+       Als Flex-Element füllt body den Rest abzüglich dieser Margins. */
+    html {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    body {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+        color: var(--content-color, CanvasText);
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    .grid {
+        display: grid;
+        /* Spalten, Zeilen und Kantenlänge setzt layoutGrid(); minmax(0, …) verhindert, dass Inhalte das Raster sprengen. */
+        grid-template-columns: repeat(var(--columns, 1), minmax(0, 1fr));
+        grid-template-rows: repeat(var(--rows, 1), minmax(0, 1fr));
+        gap: var(--gap, 8px);
+        width: 100%;
+        height: 100%;
+    }
+
+    .switch {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        align-self: center;
+        justify-self: center;
+        gap: calc(var(--size, 64px) * 0.06);
+        width: var(--size, 100%);
+        height: var(--size, 100%);
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+        padding: calc(var(--size, 64px) * 0.08);
+        border: 0;
+        border-radius: calc(var(--size, 64px) * 0.14);
+        background: color-mix(in srgb, var(--content-color, CanvasText) 6%, transparent);
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: background-color 0.15s ease, transform 0.1s ease;
+    }
+
+    .switch:hover {
+        background: color-mix(in srgb, var(--content-color, CanvasText) 12%, transparent);
+    }
+
+    .switch:active,
+    .switch[data-pressed="true"] {
+        transform: scale(0.95);
+    }
+
+    .switch:focus-visible {
+        outline: 2px solid var(--accent-color, currentColor);
+        outline-offset: -2px;
+    }
+
+    .switch:disabled {
+        cursor: default;
+        opacity: 0.4;
+        transform: none;
+    }
+
+    /* Bereich für Icon bzw. Bild; nimmt den Platz über der Beschriftung ein. */
+    .graphic {
+        flex: 1 1 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: 0;
+        line-height: 1;
+        /* icons.js ersetzt das <i> durch ein SVG mit 1em Höhe; die Schriftgröße skaliert damit das Icon. */
+        font-size: calc(var(--size, 64px) * var(--icon-scale, 0.5));
+        transition: color 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+    }
+
+    .switch[data-label="false"] .graphic {
+        --icon-scale: 0.62;
+    }
+
+    .graphic img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: calc(var(--size, 64px) * 0.06);
+    }
+
+    /* An: Icon in eigener Farbe bzw. Akzentfarbe, Bild im Original */
+    .switch[data-on="true"] .graphic {
+        color: var(--on-color, var(--accent-color, currentColor));
+    }
+
+    /* Aus: Icon grau; Bild ohne eigenes Aus-Bild in Graustufen */
+    .switch[data-on="false"] .graphic {
+        color: var(--disabled-color, currentColor);
+        opacity: 0.45;
+    }
+
+    .switch[data-on="false"][data-has-off-image="true"] .graphic {
+        opacity: 1;
+    }
+
+    .switch[data-on="false"][data-has-off-image="false"] .graphic img {
+        filter: grayscale(1);
+    }
+
+    .label {
+        flex: 0 0 auto;
+        width: 100%;
+        overflow: hidden;
+        font-size: clamp(10px, calc(var(--size, 64px) * 0.13), calc(var(--font-size, 14px) * 1.2));
+        line-height: 1.2;
+        text-align: center;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .empty {
+        display: grid;
+        place-items: center;
+        grid-column: 1 / -1;
+        grid-row: 1 / -1;
+        opacity: 0.6;
+        text-align: center;
+    }
+</style>
+
+<main class="grid" id="grid"></main>
+
+<script>
+    "use strict";
+
+    const grid = document.getElementById("grid");
+    const DEFAULT_ICON = "power-off";
+    let state = { type: "full", all: { show: false }, entries: [] };
+    // Variablen-ID => Liste der Buttons (eine Variable kann mehrfach verknüpft sein)
+    let buttonsById = new Map();
+    let allButton = null;
+
+    function validIcon(name) {
+        return typeof name === "string" && /^[a-z0-9-]+$/.test(name) ? name : DEFAULT_ICON;
+    }
+
+    function isImage(value) {
+        return typeof value === "string" && value.startsWith("data:image/");
+    }
+
+    // Wählt die Spaltenzahl, bei der die quadratischen Buttons am größten werden.
+    function layoutGrid() {
+        const count = Math.max(1, Number(grid.dataset.count) || 1);
+        const width = grid.clientWidth;
+        const height = grid.clientHeight;
+        const gap = Math.max(4, Math.min(12, Math.min(width, height) * 0.03));
+        let best = { columns: 1, rows: count, size: -1 };
+        for (let columns = 1; columns <= count; columns++) {
+            const rows = Math.ceil(count / columns);
+            const size = Math.min((width - (columns - 1) * gap) / columns, (height - (rows - 1) * gap) / rows);
+            if (size > best.size) {
+                best = { columns, rows, size };
+            }
+        }
+        grid.style.setProperty("--gap", gap + "px");
+        grid.style.setProperty("--columns", String(best.columns));
+        grid.style.setProperty("--rows", String(best.rows));
+        grid.style.setProperty("--size", Math.max(0, Math.floor(best.size)) + "px");
+    }
+
+    function iconElement(name) {
+        const icon = document.createElement("i");
+        icon.className = "fa-light fa-" + validIcon(name);
+        return icon;
+    }
+
+    // Erzeugt einen Button mit Grafik und optionaler Beschriftung; Beschriftung nur als Text.
+    function createButton(text, showLabel) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "switch";
+        const graphic = document.createElement("span");
+        graphic.className = "graphic";
+        button.append(graphic);
+        if (showLabel) {
+            const label = document.createElement("span");
+            label.className = "label";
+            label.textContent = text;
+            button.append(label);
+        }
+        button.dataset.label = String(showLabel);
+        button.title = text;
+        button.setAttribute("aria-label", text);
+        return button;
+    }
+
+    function pressFeedback(button) {
+        button.dataset.pressed = "true";
+        window.setTimeout(() => delete button.dataset.pressed, 300);
+    }
+
+    // Grafik eines Eintrags passend zum Zustand setzen; Bilder werden nur bei Bedarf ausgetauscht.
+    function applyEntryState(button, entry) {
+        const on = entry.available === true && entry.on === true;
+        button.dataset.on = String(on);
+        button.disabled = entry.available !== true;
+        button.setAttribute("aria-pressed", String(on));
+        if (!isImage(entry.imageOn)) {
+            return;
+        }
+        const image = button.querySelector(".graphic img");
+        const source = !on && isImage(entry.imageOff) ? entry.imageOff : entry.imageOn;
+        if (image && image.getAttribute("src") !== source) {
+            image.src = source;
+        }
+    }
+
+    function anyIncludedOn() {
+        return state.entries.some((entry) => entry.includeInAll === true && entry.available === true && entry.on === true);
+    }
+
+    function hasIncludedAvailable() {
+        return state.entries.some((entry) => entry.includeInAll === true && entry.available === true);
+    }
+
+    function allText() {
+        const custom = typeof state.all.label === "string" ? state.all.label.trim() : "";
+        if (custom !== "") {
+            return custom;
+        }
+        return anyIncludedOn() ? translate("All off") : translate("All on");
+    }
+
+    function applyAllState() {
+        if (!allButton) {
+            return;
+        }
+        const on = anyIncludedOn();
+        const text = allText();
+        allButton.dataset.on = String(on);
+        allButton.disabled = !hasIncludedAvailable();
+        allButton.setAttribute("aria-pressed", String(on));
+        allButton.title = text;
+        allButton.setAttribute("aria-label", text);
+        const label = allButton.querySelector(".label");
+        if (label) {
+            label.textContent = text;
+        }
+    }
+
+    function renderFull() {
+        const entries = Array.isArray(state.entries) ? state.entries : [];
+        const showAll = state.all && state.all.show === true && entries.length > 0;
+        grid.replaceChildren();
+        buttonsById = new Map();
+        allButton = null;
+        grid.dataset.count = String(entries.length + (showAll ? 1 : 0));
+        layoutGrid();
+
+        if (entries.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "empty";
+            empty.textContent = translate("No actuators configured");
+            grid.append(empty);
+            return;
+        }
+
+        // Alle an/aus steht immer an erster Stelle.
+        if (showAll) {
+            allButton = createButton(allText(), true);
+            allButton.dataset.hasOffImage = "false";
+            allButton.querySelector(".graphic").append(iconElement(state.all.icon));
+            allButton.addEventListener("click", () => {
+                pressFeedback(allButton);
+                requestAction("All", true);
+            });
+            grid.append(allButton);
+        }
+
+        entries.forEach((entry) => {
+            const text = entry.available === true ? String(entry.label) : String(entry.label || translate("Not available"));
+            const hasImage = isImage(entry.imageOn);
+            // Ohne Bild und ohne Beschriftung wäre der Button bei gleichen Icons nicht zuzuordnen; daher bleibt der Text als Tooltip.
+            const button = createButton(text, entry.showLabel !== false);
+            const graphic = button.querySelector(".graphic");
+            button.dataset.hasOffImage = String(hasImage && isImage(entry.imageOff));
+            if (hasImage) {
+                const image = document.createElement("img");
+                image.alt = "";
+                image.src = entry.imageOn;
+                graphic.append(image);
+            } else {
+                graphic.append(iconElement(entry.icon));
+                if (typeof entry.color === "string" && /^#[0-9A-Fa-f]{6}$/.test(entry.color)) {
+                    button.style.setProperty("--on-color", entry.color);
+                }
+            }
+            applyEntryState(button, entry);
+            button.addEventListener("click", () => {
+                pressFeedback(button);
+                requestAction("Toggle", Number(entry.id));
+            });
+            const list = buttonsById.get(entry.id) || [];
+            list.push({ button, entry });
+            buttonsById.set(entry.id, list);
+            grid.append(button);
+        });
+        applyAllState();
+    }
+
+    // Nur Schaltzustände aktualisieren, ohne die Bilder erneut zu übertragen oder das Raster neu aufzubauen.
+    function applyStates(states) {
+        states.forEach((item) => {
+            (buttonsById.get(item.id) || []).forEach(({ button, entry }) => {
+                const wasAvailable = entry.available;
+                entry.available = item.available === true;
+                entry.on = item.on === true;
+                applyEntryState(button, entry);
+                if (wasAvailable !== entry.available && entry.available !== true) {
+                    button.title = entry.label || translate("Not available");
+                }
+            });
+        });
+        applyAllState();
+    }
+
+    function handleMessage(data) {
+        let message = data;
+        if (typeof message === "string") {
+            try {
+                message = JSON.parse(message);
+            } catch (error) {
+                return;
+            }
+        }
+        if (!message || typeof message !== "object" || Array.isArray(message)) {
+            return;
+        }
+        if (message.type === "states" && Array.isArray(message.states)) {
+            applyStates(message.states);
+        } else if (message.type === "full") {
+            state = message;
+            if (!state.all || typeof state.all !== "object") {
+                state.all = { show: false };
+            }
+            renderFull();
+        }
+    }
+
+    new ResizeObserver(layoutGrid).observe(grid);
+    handleMessage(__QUICKSWITCH_INITIAL_STATE__);
+</script>

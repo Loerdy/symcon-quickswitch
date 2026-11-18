@@ -1,0 +1,135 @@
+{
+    "elements": [
+        {
+            "type": "List",
+            "name": "Entries",
+            "caption": "Actuators",
+            "rowCount": 8,
+            "add": true,
+            "delete": true,
+            "changeOrder": true,
+            "columns": [
+                {
+                    "caption": "Variable (Boolean with action)",
+                    "name": "variable",
+                    "width": "280px",
+                    "add": 0,
+                    "edit": {
+                        "type": "SelectVariable",
+                        "validVariableTypes": [0],
+                        "requiredAction": 1
+                    }
+                },
+                {
+                    "caption": "Label (optional)",
+                    "name": "label",
+                    "width": "auto",
+                    "add": "",
+                    "edit": {
+                        "type": "ValidationTextBox"
+                    }
+                },
+                {
+                    "caption": "Show label",
+                    "name": "showLabel",
+                    "width": "130px",
+                    "add": true,
+                    "edit": {
+                        "type": "CheckBox"
+                    }
+                },
+                {
+                    "caption": "Icon",
+                    "name": "icon",
+                    "width": "160px",
+                    "add": "lightbulb",
+                    "edit": {
+                        "type": "SelectIcon"
+                    }
+                },
+                {
+                    "caption": "Icon color when on",
+                    "name": "color",
+                    "width": "170px",
+                    "add": -1,
+                    "edit": {
+                        "type": "SelectColor"
+                    }
+                },
+                {
+                    "caption": "Image on (optional)",
+                    "name": "imageOn",
+                    "width": "200px",
+                    "add": 0,
+                    "edit": {
+                        "type": "SelectMedia"
+                    }
+                },
+                {
+                    "caption": "Image off (optional)",
+                    "name": "imageOff",
+                    "width": "200px",
+                    "add": 0,
+                    "edit": {
+                        "type": "SelectMedia"
+                    }
+                },
+                {
+                    "caption": "Include in All on/off",
+                    "name": "includeInAll",
+                    "width": "170px",
+                    "add": true,
+                    "edit": {
+                        "type": "CheckBox"
+                    }
+                }
+            ]
+        },
+        {
+            "type": "Label",
+            "caption": "Without an on image, the icon is shown: in the selected color (or the accent color) when on, grey when off. With an on image, it is shown when on; when off, the off image is shown or, without one, the on image in grey. Images must be JPEG or PNG media objects of at most 512 KB."
+        },
+        {
+            "type": "Label",
+            "caption": "Without a label, the name of the device (parent instance) or of the variable is used."
+        },
+        {
+            "type": "ExpansionPanel",
+            "caption": "All on/off button",
+            "items": [
+                {
+                    "type": "CheckBox",
+                    "name": "ShowAllButton",
+                    "caption": "Show All on/off button (always first in the tile)"
+                },
+                {
+                    "type": "ValidationTextBox",
+                    "name": "AllLabel",
+                    "caption": "Label (empty = \"All on\" / \"All off\")"
+                },
+                {
+                    "type": "SelectIcon",
+                    "name": "AllIcon",
+                    "caption": "Icon"
+                },
+                {
+                    "type": "Label",
+                    "caption": "If at least one included actuator is on, the button switches all included actuators off, otherwise on."
+                }
+            ]
+        }
+    ],
+    "actions": [],
+    "status": [
+        {
+            "code": 201,
+            "icon": "error",
+            "caption": "At least one entry is invalid (variable missing, not Boolean or without action). See the debug output."
+        },
+        {
+            "code": 202,
+            "icon": "error",
+            "caption": "The list of actuators could not be read."
+        }
+    ]
+}

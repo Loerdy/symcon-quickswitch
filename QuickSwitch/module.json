@@ -1,0 +1,14 @@
+{
+    "id": "{D3685124-6D26-278F-31C4-DFDA6D580F21}",
+    "name": "QuickSwitch",
+    "type": 3,
+    "vendor": "",
+    "aliases": [
+        "Quick Switch"
+    ],
+    "url": "https://github.com/Loerdy/symcon-quickswitch/blob/main/QuickSwitch/README.md",
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "QSW"
+}

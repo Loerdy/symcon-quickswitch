@@ -1,0 +1,12 @@
+{
+    "id": "{8E6E913A-EF6B-050C-8DD1-9AD8BDB3D95D}",
+    "author": "Loerdy",
+    "name": "QuickSwitch",
+    "url": "https://github.com/Loerdy/symcon-quickswitch",
+    "compatibility": {
+        "version": "8.2"
+    },
+    "version": "1.0",
+    "build": 0,
+    "date": 1794960000
+}

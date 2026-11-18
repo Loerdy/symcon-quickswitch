@@ -1,0 +1,31 @@
+{
+    "translations": {
+        "de": {
+            "QuickSwitch": "QuickSwitch",
+            "Quick Switch": "Schnellschalter",
+            "Actuators": "Aktoren",
+            "Variable (Boolean with action)": "Variable (Boolean mit Aktion)",
+            "Label (optional)": "Beschriftung (optional)",
+            "Show label": "Beschriftung anzeigen",
+            "Icon": "Icon",
+            "Icon color when on": "Iconfarbe bei An",
+            "Image on (optional)": "Bild An (optional)",
+            "Image off (optional)": "Bild Aus (optional)",
+            "Include in All on/off": "Bei Alle an/aus schalten",
+            "Without an on image, the icon is shown: in the selected color (or the accent color) when on, grey when off. With an on image, it is shown when on; when off, the off image is shown or, without one, the on image in grey. Images must be JPEG or PNG media objects of at most 512 KB.": "Ohne An-Bild wird das Icon angezeigt: bei An in der gewählten Farbe (bzw. der Akzentfarbe), bei Aus grau. Mit An-Bild wird dieses bei An angezeigt; bei Aus das Aus-Bild oder, falls keines hinterlegt ist, das An-Bild in Grau. Bilder müssen JPEG- oder PNG-Medienobjekte mit höchstens 512 KB sein.",
+            "Without a label, the name of the device (parent instance) or of the variable is used.": "Ohne Beschriftung wird der Name des Geräts (übergeordnete Instanz) bzw. der Variable verwendet.",
+            "All on/off button": "Button Alle an/aus",
+            "Show All on/off button (always first in the tile)": "Button Alle an/aus anzeigen (immer an erster Stelle der Kachel)",
+            "Label (empty = \"All on\" / \"All off\")": "Beschriftung (leer = „Alle an“ / „Alle aus“)",
+            "If at least one included actuator is on, the button switches all included actuators off, otherwise on.": "Ist mindestens einer der berücksichtigten Aktoren an, schaltet der Button alle berücksichtigten Aktoren aus, sonst an.",
+            "At least one entry is invalid (variable missing, not Boolean or without action). See the debug output.": "Mindestens ein Eintrag ist ungültig (Variable fehlt, ist nicht Boolean oder hat keine Aktion). Details in der Debug-Ausgabe.",
+            "The list of actuators could not be read.": "Die Liste der Aktoren konnte nicht gelesen werden.",
+            "Unknown action: %s": "Unbekannte Aktion: %s",
+            "Switching variable %d failed.": "Schalten der Variable %d ist fehlgeschlagen.",
+            "All on": "Alle an",
+            "All off": "Alle aus",
+            "No actuators configured": "Keine Aktoren konfiguriert",
+            "Not available": "Nicht verfügbar"
+        }
+    }
+}
