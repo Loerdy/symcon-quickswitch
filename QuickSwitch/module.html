@@ -21,12 +21,12 @@
 
     .grid {
         display: grid;
-        /* Spalten, Zeilen, Kantenlänge und Beschriftungshöhe setzt layoutGrid(). Der Block aus Schaltflächen
-           wird als Ganzes zentriert, damit freier Platz nicht zwischen den Zeilen entsteht. */
+        /* Spalten, Maße und Beschriftungshöhe setzt layoutGrid(). Wie bei den Symcon-Kacheln beginnt der Inhalt
+           oben am Rand der Visualisierung (body-Margins); restliche Höhe nutzen die Schaltflächen selbst. */
         grid-template-columns: repeat(var(--columns, 1), var(--size, 64px));
         grid-auto-rows: auto;
         justify-content: center;
-        align-content: center;
+        align-content: start;
         gap: var(--gap, 8px);
         width: 100%;
         height: 100%;
@@ -69,7 +69,7 @@
         justify-content: center;
         flex: 0 0 auto;
         width: var(--size, 64px);
-        height: var(--size, 64px);
+        height: var(--face-height, var(--size, 64px));
         overflow: hidden;
         padding: calc(var(--size, 64px) * 0.1);
         border-radius: calc(var(--size, 64px) * 0.16);
@@ -197,7 +197,7 @@
         const width = grid.clientWidth;
         const height = grid.clientHeight;
         const gap = Math.max(6, Math.min(14, Math.min(width, height) * 0.03 + 2));
-        let best = { columns: 1, size: -1 };
+        let best = { columns: 1, rows: count, size: -1 };
         for (let columns = 1; columns <= count; columns++) {
             const rows = Math.ceil(count / columns);
             const cellHeight = (height - (rows - 1) * gap) / rows;
@@ -208,15 +208,19 @@
                 size = Math.min((width - (columns - 1) * gap) / columns, cellHeight - label.height - label.gap);
             }
             if (size > best.size) {
-                best = { columns, size };
+                best = { columns, rows, size };
             }
         }
         // 1 px Reserve gegen Rundung der Beschriftungshöhe
         const size = Math.max(0, Math.floor(best.size) - 1);
         const label = labelMetrics(size, withLabels);
+        // Begrenzt die Breite die Größe, füllen die Schaltflächen die Höhe bis zum unteren Rand (höchstens 30 % höher als breit).
+        const rowHeight = (height - (best.rows - 1) * gap) / best.rows;
+        const faceHeight = Math.max(size, Math.min(Math.floor(rowHeight - label.height - label.gap) - 1, Math.round(size * 1.3)));
         grid.style.setProperty("--gap", gap + "px");
         grid.style.setProperty("--columns", String(best.columns));
         grid.style.setProperty("--size", size + "px");
+        grid.style.setProperty("--face-height", faceHeight + "px");
         grid.style.setProperty("--label-size", label.fontSize + "px");
         grid.style.setProperty("--label-height", label.height + "px");
         grid.style.setProperty("--label-gap", label.gap + "px");
