@@ -22,8 +22,9 @@
 
     .grid {
         display: grid;
-        /* Spalten, Maße und Beschriftungshöhe setzt layoutGrid() (wie bei QuickSwitch). */
-        grid-template-columns: repeat(var(--columns, 1), var(--size, 64px));
+        /* Spalten, Maße und Beschriftungshöhe setzt layoutGrid() (wie bei QuickSwitch). Begrenzt die Höhe die
+           Größe, werden die Schaltflächen breiter (--face-width), damit eine flache Kachel gefüllt wird. */
+        grid-template-columns: repeat(var(--columns, 1), var(--face-width, var(--size, 64px)));
         grid-auto-rows: auto;
         justify-content: center;
         align-content: center;
@@ -41,7 +42,7 @@
 
     .cell {
         position: relative;
-        width: var(--size, 64px);
+        width: var(--face-width, var(--size, 64px));
         min-width: 0;
     }
 
@@ -83,7 +84,7 @@
         align-items: center;
         justify-content: center;
         flex: 0 0 auto;
-        width: var(--size, 64px);
+        width: var(--face-width, var(--size, 64px));
         height: var(--face-height, var(--size, 64px));
         overflow: hidden;
         padding: calc(var(--size, 64px) * 0.1);
@@ -130,7 +131,7 @@
         height: 100%;
         line-height: 1;
         /* icons.js ersetzt das <i> durch ein SVG mit 1em Höhe; die Schriftgröße skaliert damit das Icon. */
-        font-size: calc(var(--size, 64px) * 0.54);
+        font-size: calc(var(--size, 64px) * 0.58);
         color: var(--state-color);
         transition: color 0.2s ease, opacity 0.2s ease;
     }
@@ -408,7 +409,8 @@
         const lines = Number(grid.dataset.lines) || 0;
         const width = grid.clientWidth;
         const height = grid.clientHeight;
-        const gap = Math.max(6, Math.min(14, Math.min(width, height) * 0.03 + 2));
+        // Abstand nach der Kachelbreite: gleich breite QuickSwitch- und QuickLock-Kacheln haben denselben Abstand.
+        const gap = Math.max(6, Math.min(14, width * 0.03 + 2));
         let best = { columns: 1, rows: count, size: -1 };
         for (let columns = 1; columns <= count; columns++) {
             const rows = Math.ceil(count / columns);
@@ -426,9 +428,13 @@
         const label = labelMetrics(size, lines);
         const rowHeight = (height - (best.rows - 1) * gap) / best.rows;
         const faceHeight = Math.max(size, Math.min(Math.floor(rowHeight - label.height - label.gap) - 1, Math.round(size * 1.3)));
+        // Begrenzt die Höhe die Größe, füllen die Schaltflächen die Breite (höchstens 60 % breiter als hoch).
+        const columnWidth = (width - (best.columns - 1) * gap) / best.columns;
+        const faceWidth = Math.max(size, Math.min(Math.floor(columnWidth) - 1, Math.round(faceHeight * 1.6)));
         grid.style.setProperty("--gap", gap + "px");
         grid.style.setProperty("--columns", String(best.columns));
         grid.style.setProperty("--size", size + "px");
+        grid.style.setProperty("--face-width", faceWidth + "px");
         grid.style.setProperty("--face-height", faceHeight + "px");
         grid.style.setProperty("--label-size", label.fontSize + "px");
         grid.style.setProperty("--line-height", label.lineHeight + "px");
