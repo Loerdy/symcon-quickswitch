@@ -1,0 +1,36 @@
+{
+    "translations": {
+        "de": {
+            "QuickLock": "QuickLock",
+            "Quick Lock": "Schnellschloss",
+            "Locks": "Schlösser",
+            "Status variable (lock state)": "Statusvariable (Verriegelungsstatus)",
+            "Action variable (lock/unlock)": "Aktionsvariable (Türschloss)",
+            "Label (optional)": "Beschriftung (optional)",
+            "Show label": "Beschriftung anzeigen",
+            "Confirm open": "Öffnen bestätigen",
+            "Confirm unlock": "Entriegeln bestätigen",
+            "Status variable: Matter attribute DoorLock_LockState (0 = not fully locked, 1 = locked, 2 = unlocked, 3 = unlatched). Action variable: DoorLock_LockUnlockUnbolt (0 = open, 1 = unlock, 2 = lock).": "Statusvariable: Matter-Attribut DoorLock_LockState (0 = nicht vollständig verriegelt, 1 = verriegelt, 2 = entriegelt, 3 = entsperrt). Aktionsvariable: DoorLock_LockUnlockUnbolt (0 = öffnen, 1 = entriegeln, 2 = verriegeln).",
+            "Which commands a lock offers is read from the presentation of the action variable. If it contains the value 1 (unlock), the button gets an arrow with all commands. Captions, icons and colors are taken from the presentation as well.": "Welche Befehle ein Schloss bietet, wird aus der Darstellung der Aktionsvariable gelesen. Enthält sie den Wert 1 (entriegeln), erhält der Button einen Pfeil mit allen Befehlen. Beschriftungen, Icons und Farben werden ebenfalls aus der Darstellung übernommen.",
+            "Tapping the button locks the door or, if it is locked, unlocks it (value 1, or value 0 if the lock has no value 1). Without a label, the name of the device (parent instance of the action variable) is used.": "Antippen des Buttons verriegelt die Tür bzw. schließt sie auf, wenn sie verriegelt ist (Wert 1, oder Wert 0, wenn das Schloss keinen Wert 1 hat). Ohne Beschriftung wird der Name des Geräts (übergeordnete Instanz der Aktionsvariable) verwendet.",
+            "Show lock state as text below the button": "Verriegelungsstatus als Text unter dem Button anzeigen",
+            "At least one entry is invalid (variable missing, not Integer or action variable without action). See the debug output.": "Mindestens ein Eintrag ist ungültig (Variable fehlt, ist nicht Integer oder Aktionsvariable ohne Aktion). Details in der Debug-Ausgabe.",
+            "The list of locks could not be read.": "Die Liste der Schlösser konnte nicht gelesen werden.",
+            "Unknown action: %s": "Unbekannte Aktion: %s",
+            "Command %d for variable %d failed.": "Befehl %d für Variable %d ist fehlgeschlagen.",
+            "Open": "Öffnen",
+            "Unlock": "Entriegeln",
+            "Lock": "Verriegeln",
+            "Not fully locked": "Nicht vollständig verriegelt",
+            "Locked": "Verriegelt",
+            "Unlocked": "Entriegelt",
+            "Unlatched": "Entsperrt",
+            "Unknown": "Unbekannt",
+            "No locks configured": "Keine Schlösser konfiguriert",
+            "Not available": "Nicht verfügbar",
+            "More commands": "Weitere Befehle",
+            "Cancel": "Abbrechen",
+            "Command failed": "Befehl fehlgeschlagen"
+        }
+    }
+}

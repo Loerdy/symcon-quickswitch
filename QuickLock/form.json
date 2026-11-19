@@ -1,0 +1,106 @@
+{
+    "elements": [
+        {
+            "type": "List",
+            "name": "Entries",
+            "caption": "Locks",
+            "rowCount": 5,
+            "add": true,
+            "delete": true,
+            "changeOrder": true,
+            "columns": [
+                {
+                    "caption": "Status variable (lock state)",
+                    "name": "statusVariable",
+                    "width": "260px",
+                    "add": 0,
+                    "edit": {
+                        "type": "SelectVariable",
+                        "validVariableTypes": [
+                            1
+                        ]
+                    }
+                },
+                {
+                    "caption": "Action variable (lock/unlock)",
+                    "name": "actionVariable",
+                    "width": "260px",
+                    "add": 0,
+                    "edit": {
+                        "type": "SelectVariable",
+                        "validVariableTypes": [
+                            1
+                        ],
+                        "requiredAction": 1
+                    }
+                },
+                {
+                    "caption": "Label (optional)",
+                    "name": "label",
+                    "width": "auto",
+                    "add": "",
+                    "edit": {
+                        "type": "ValidationTextBox"
+                    }
+                },
+                {
+                    "caption": "Show label",
+                    "name": "showLabel",
+                    "width": "130px",
+                    "add": true,
+                    "edit": {
+                        "type": "CheckBox"
+                    }
+                },
+                {
+                    "caption": "Confirm open",
+                    "name": "confirmOpen",
+                    "width": "140px",
+                    "add": true,
+                    "edit": {
+                        "type": "CheckBox"
+                    }
+                },
+                {
+                    "caption": "Confirm unlock",
+                    "name": "confirmUnlock",
+                    "width": "150px",
+                    "add": false,
+                    "edit": {
+                        "type": "CheckBox"
+                    }
+                }
+            ]
+        },
+        {
+            "type": "Label",
+            "caption": "Status variable: Matter attribute DoorLock_LockState (0 = not fully locked, 1 = locked, 2 = unlocked, 3 = unlatched). Action variable: DoorLock_LockUnlockUnbolt (0 = open, 1 = unlock, 2 = lock)."
+        },
+        {
+            "type": "Label",
+            "caption": "Which commands a lock offers is read from the presentation of the action variable. If it contains the value 1 (unlock), the button gets an arrow with all commands. Captions, icons and colors are taken from the presentation as well."
+        },
+        {
+            "type": "Label",
+            "caption": "Tapping the button locks the door or, if it is locked, unlocks it (value 1, or value 0 if the lock has no value 1). Without a label, the name of the device (parent instance of the action variable) is used."
+        },
+        {
+            "type": "CheckBox",
+            "name": "ShowStatus",
+            "caption": "Show lock state as text below the button"
+        }
+    ],
+    "actions": [],
+    "status": [
+        {
+            "code": 201,
+            "icon": "error",
+            "caption": "At least one entry is invalid (variable missing, not Integer or action variable without action). See the debug output."
+        },
+        {
+            "code": 202,
+            "icon": "error",
+            "caption": "The list of locks could not be read."
+        }
+    ]
+}

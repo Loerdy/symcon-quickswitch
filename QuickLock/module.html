@@ -1,0 +1,741 @@
+<script src="/icons.js"></script>
+<style>
+    /* Abstände und Schrift setzt die Visualisierung am body, deshalb body-Margins nicht überschreiben.
+       Als Flex-Element füllt body den Rest abzüglich dieser Margins. */
+    html {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    body {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+        color: var(--content-color, CanvasText);
+    }
+
+    * {
+        box-sizing: border-box;
+    }
+
+    .grid {
+        display: grid;
+        /* Spalten, Maße und Beschriftungshöhe setzt layoutGrid() (wie bei QuickSwitch). */
+        grid-template-columns: repeat(var(--columns, 1), var(--size, 64px));
+        grid-auto-rows: auto;
+        justify-content: center;
+        align-content: center;
+        gap: var(--gap, 8px);
+        width: 100%;
+        height: 100%;
+        transition: opacity 0.15s ease;
+    }
+
+    /* Bei geöffnetem Menü bzw. geöffneter Rückfrage tritt das Raster zurück. */
+    .grid[data-dimmed="true"] {
+        opacity: 0.08;
+        pointer-events: none;
+    }
+
+    .cell {
+        position: relative;
+        width: var(--size, 64px);
+        min-width: 0;
+    }
+
+    /* Schaltfläche = Fläche mit Grafik, darunter Beschriftung und Verriegelungsstatus */
+    .lock {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--label-gap, 4px);
+        width: 100%;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .lock:focus-visible,
+    .more:focus-visible,
+    .action:focus-visible {
+        outline: none;
+    }
+
+    .lock:focus-visible .face,
+    .action:focus-visible {
+        outline: 2px solid var(--accent-color, currentColor);
+        outline-offset: -2px;
+    }
+
+    .lock:disabled {
+        cursor: default;
+        opacity: 0.4;
+    }
+
+    .face {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        width: var(--size, 64px);
+        height: var(--face-height, var(--size, 64px));
+        overflow: hidden;
+        padding: calc(var(--size, 64px) * 0.1);
+        border-radius: calc(var(--size, 64px) * 0.16);
+        background: color-mix(in srgb, var(--content-color, CanvasText) 6%, transparent);
+        transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;
+    }
+
+    .lock:hover .face {
+        background: color-mix(in srgb, var(--content-color, CanvasText) 10%, transparent);
+    }
+
+    /* Nicht verriegelt: Fläche in der Zustandsfarbe hinterlegt, damit es auf einen Blick auffällt. */
+    .cell[data-state="unlocked"] .face,
+    .cell[data-state="unlatched"] .face,
+    .cell[data-state="notLocked"] .face {
+        background: color-mix(in srgb, var(--state-color) 16%, transparent);
+    }
+
+    .cell[data-state="unlocked"] .lock:hover .face,
+    .cell[data-state="unlatched"] .lock:hover .face,
+    .cell[data-state="notLocked"] .lock:hover .face {
+        background: color-mix(in srgb, var(--state-color) 24%, transparent);
+    }
+
+    .lock:active .face,
+    .lock[data-pressed="true"] .face {
+        transform: scale(0.95);
+    }
+
+    .lock:disabled .face {
+        transform: none;
+    }
+
+    .cell[data-failed="true"] .face {
+        box-shadow: inset 0 0 0 2px #E5484D;
+    }
+
+    .graphic {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        line-height: 1;
+        /* icons.js ersetzt das <i> durch ein SVG mit 1em Höhe; die Schriftgröße skaliert damit das Icon. */
+        font-size: calc(var(--size, 64px) * 0.54);
+        color: var(--state-color);
+        transition: color 0.2s ease, opacity 0.2s ease;
+    }
+
+    /* Zustandsfarben: aus der Darstellung (--own-color), sonst Akzentfarbe bzw. feste Warnfarben */
+    .cell[data-state="locked"] {
+        --state-color: var(--own-color, var(--accent-color, currentColor));
+    }
+
+    .cell[data-state="unlocked"],
+    .cell[data-state="unlatched"] {
+        --state-color: var(--own-color, #F0A30A);
+    }
+
+    .cell[data-state="notLocked"] {
+        --state-color: #E5484D;
+    }
+
+    .cell[data-state="unknown"] {
+        --state-color: var(--disabled-color, currentColor);
+    }
+
+    .cell[data-state="unknown"] .graphic {
+        opacity: 0.45;
+    }
+
+    /* Befehl gesendet, Rückmeldung des Schlosses steht noch aus */
+    .cell[data-pending="true"] .graphic {
+        animation: pending 1.1s ease-in-out infinite;
+    }
+
+    @keyframes pending {
+        50% {
+            opacity: 0.3;
+        }
+    }
+
+    .label {
+        flex: 0 0 auto;
+        width: 100%;
+        height: var(--line-height, 1.2em);
+        overflow: hidden;
+        font-size: var(--label-size, 12px);
+        line-height: var(--line-height, 1.2em);
+        text-align: center;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .label + .label {
+        margin-top: calc(var(--label-gap, 4px) * -1);
+    }
+
+    .status-text {
+        opacity: 0.7;
+    }
+
+    .cell[data-state="notLocked"] .status-text {
+        color: #E5484D;
+        opacity: 1;
+    }
+
+    /* Pfeil für alle Befehle, rechts unten in der Fläche */
+    .more {
+        position: absolute;
+        top: calc(var(--face-height, var(--size, 64px)) - var(--more-size, 24px) - var(--size, 64px) * 0.05);
+        right: calc(var(--size, 64px) * 0.05);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--more-size, 24px);
+        height: var(--more-size, 24px);
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--content-color, CanvasText) 12%, transparent);
+        color: inherit;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .more:hover,
+    .more:focus-visible {
+        background: color-mix(in srgb, var(--content-color, CanvasText) 22%, transparent);
+    }
+
+    .more:disabled {
+        display: none;
+    }
+
+    .more svg {
+        width: 60%;
+        height: 60%;
+    }
+
+    .empty {
+        display: grid;
+        place-items: center;
+        grid-column: 1 / -1;
+        grid-row: 1 / -1;
+        opacity: 0.6;
+        text-align: center;
+    }
+
+    /* Menü und Rückfrage liegen über dem abgedunkelten Raster */
+    .overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.6em;
+        padding: 4px;
+        text-align: center;
+    }
+
+    .overlay[hidden] {
+        display: none;
+    }
+
+    .overlay-title {
+        max-width: 100%;
+        overflow: hidden;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .overlay-text {
+        opacity: 0.75;
+    }
+
+    .actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.5em;
+        max-width: 100%;
+    }
+
+    .action {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45em;
+        min-height: 2.4em;
+        padding: 0.35em 0.9em;
+        border: 0;
+        border-radius: 1.2em;
+        background: color-mix(in srgb, var(--action-color, var(--content-color, CanvasText)) 16%, transparent);
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .action:hover {
+        background: color-mix(in srgb, var(--action-color, var(--content-color, CanvasText)) 26%, transparent);
+    }
+
+    .action .action-icon {
+        color: var(--action-color, currentColor);
+        line-height: 1;
+    }
+
+    .action.cancel {
+        background: none;
+        opacity: 0.75;
+    }
+</style>
+
+<main class="grid" id="grid"></main>
+<div class="overlay" id="overlay" hidden role="dialog" aria-modal="true">
+    <div class="overlay-title" id="overlay-title"></div>
+    <div class="overlay-text" id="overlay-text"></div>
+    <div class="actions" id="overlay-actions"></div>
+</div>
+
+<script>
+    "use strict";
+
+    const grid = document.getElementById("grid");
+    const overlay = document.getElementById("overlay");
+    const overlayTitle = document.getElementById("overlay-title");
+    const overlayText = document.getElementById("overlay-text");
+    const overlayActions = document.getElementById("overlay-actions");
+
+    // Werte der Aktionsvariable (Matter DoorLock_LockUnlockUnbolt) und zugehörige Aktionen des Moduls
+    const COMMAND_OPEN = 0;
+    const COMMAND_UNLOCK = 1;
+    const COMMAND_LOCK = 2;
+    const COMMAND_IDENTS = { 0: "Open", 1: "Unlock", 2: "Lock" };
+    // Werte der Statusvariable (Matter DoorLock_LockState)
+    const STATE_LOCKED = 1;
+    const STATE_UNLOCKED = 2;
+    // Spätestens dann gilt ein gesendeter Befehl als abgeschlossen, auch ohne Rückmeldung.
+    const PENDING_TIMEOUT = 30000;
+
+    let state = { type: "full", showStatus: false, entries: [] };
+    let structureKey = "";
+    // Variablen-ID => Liste der Zellen (ein Schloss kann mehrfach verknüpft sein)
+    let cellsById = new Map();
+    // Variablen-ID => { status, timer } eines gesendeten Befehls
+    const pendingById = new Map();
+    let overlayEntryId = null;
+
+    function validIcon(name, fallback) {
+        return typeof name === "string" && /^[a-z0-9-]+$/.test(name) ? name : fallback;
+    }
+
+    function validColor(value) {
+        return typeof value === "string" && /^#[0-9A-Fa-f]{6}$/.test(value) ? value : "";
+    }
+
+    function iconElement(name, fallback) {
+        const icon = document.createElement("i");
+        icon.className = "fa-light fa-" + validIcon(name, fallback);
+        return icon;
+    }
+
+    function chevronElement() {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 24 24");
+        svg.setAttribute("aria-hidden", "true");
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", "M6 9l6 6 6-6");
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", "currentColor");
+        path.setAttribute("stroke-width", "2.5");
+        path.setAttribute("stroke-linecap", "round");
+        path.setAttribute("stroke-linejoin", "round");
+        svg.append(path);
+        return svg;
+    }
+
+    function hasCommand(entry, value) {
+        return Array.isArray(entry.commands) && entry.commands.some((command) => command.value === value);
+    }
+
+    function findCommand(entry, value) {
+        return (entry.commands || []).find((command) => command.value === value) || null;
+    }
+
+    // Pfeil nur bei Schlössern, die Öffnen und Entriegeln getrennt anbieten; sonst entspricht das Menü dem Antippen.
+    function hasMenu(entry) {
+        return hasCommand(entry, COMMAND_OPEN) && hasCommand(entry, COMMAND_UNLOCK);
+    }
+
+    // Antippen: verriegelt => aufschließen (Entriegeln, sonst Öffnen), sonst verriegeln. Gleiche Regel wie im Modul.
+    function toggleCommand(entry) {
+        if (entry.status !== STATE_LOCKED) {
+            return COMMAND_LOCK;
+        }
+        return hasCommand(entry, COMMAND_UNLOCK) ? COMMAND_UNLOCK : COMMAND_OPEN;
+    }
+
+    function needsConfirmation(entry, command) {
+        return (command === COMMAND_OPEN && entry.confirmOpen === true) || (command === COMMAND_UNLOCK && entry.confirmUnlock === true);
+    }
+
+    // Maße der Beschriftungszeilen unter der Fläche; wachsen mit der Schaltfläche, höchstens etwas über die Designschrift.
+    function labelMetrics(size, lines) {
+        if (lines === 0) {
+            return { fontSize: 0, lineHeight: 0, height: 0, gap: 0 };
+        }
+        const base = parseFloat(getComputedStyle(document.body).fontSize) || 14;
+        const fontSize = Math.max(10, Math.min(size * 0.14, base * 1.15));
+        const lineHeight = Math.ceil(fontSize * 1.25);
+        return { fontSize, lineHeight, height: lineHeight * lines, gap: Math.max(2, Math.round(size * 0.05)) };
+    }
+
+    // Wählt die Spaltenzahl, bei der die Schaltflächen (inkl. Beschriftung darunter) am größten werden.
+    function layoutGrid() {
+        const count = Math.max(1, Number(grid.dataset.count) || 1);
+        const lines = Number(grid.dataset.lines) || 0;
+        const width = grid.clientWidth;
+        const height = grid.clientHeight;
+        const gap = Math.max(6, Math.min(14, Math.min(width, height) * 0.03 + 2));
+        let best = { columns: 1, rows: count, size: -1 };
+        for (let columns = 1; columns <= count; columns++) {
+            const rows = Math.ceil(count / columns);
+            const cellHeight = (height - (rows - 1) * gap) / rows;
+            let size = Math.min((width - (columns - 1) * gap) / columns, cellHeight);
+            for (let i = 0; i < 4; i++) {
+                const label = labelMetrics(size, lines);
+                size = Math.min((width - (columns - 1) * gap) / columns, cellHeight - label.height - label.gap);
+            }
+            if (size > best.size) {
+                best = { columns, rows, size };
+            }
+        }
+        const size = Math.max(0, Math.floor(best.size) - 1);
+        const label = labelMetrics(size, lines);
+        const rowHeight = (height - (best.rows - 1) * gap) / best.rows;
+        const faceHeight = Math.max(size, Math.min(Math.floor(rowHeight - label.height - label.gap) - 1, Math.round(size * 1.3)));
+        grid.style.setProperty("--gap", gap + "px");
+        grid.style.setProperty("--columns", String(best.columns));
+        grid.style.setProperty("--size", size + "px");
+        grid.style.setProperty("--face-height", faceHeight + "px");
+        grid.style.setProperty("--label-size", label.fontSize + "px");
+        grid.style.setProperty("--line-height", label.lineHeight + "px");
+        grid.style.setProperty("--label-gap", label.gap + "px");
+        grid.style.setProperty("--more-size", Math.round(Math.max(22, Math.min(36, size * 0.26))) + "px");
+    }
+
+    function pressFeedback(button) {
+        button.dataset.pressed = "true";
+        window.setTimeout(() => delete button.dataset.pressed, 300);
+    }
+
+    // --------- Befehle ---------
+
+    function clearPending(id) {
+        const pending = pendingById.get(id);
+        if (pending) {
+            window.clearTimeout(pending.timer);
+            pendingById.delete(id);
+        }
+        (cellsById.get(id) || []).forEach(({ cell }) => delete cell.dataset.pending);
+    }
+
+    function setPending(entry) {
+        clearPending(entry.id);
+        const timer = window.setTimeout(() => clearPending(entry.id), PENDING_TIMEOUT);
+        pendingById.set(entry.id, { status: entry.status, timer });
+        (cellsById.get(entry.id) || []).forEach(({ cell }) => (cell.dataset.pending = "true"));
+    }
+
+    function showFailed(id) {
+        clearPending(id);
+        (cellsById.get(id) || []).forEach(({ cell }) => {
+            cell.dataset.failed = "true";
+            window.setTimeout(() => delete cell.dataset.failed, 2500);
+        });
+    }
+
+    function sendCommand(entry, command) {
+        requestAction(COMMAND_IDENTS[command], Number(entry.id));
+        // Ist das Schloss schon im Zielzustand, kommt keine Statusänderung; dann nichts als laufend anzeigen.
+        const alreadyThere = (command === COMMAND_LOCK && entry.status === STATE_LOCKED) || (command === COMMAND_UNLOCK && entry.status === STATE_UNLOCKED);
+        if (!alreadyThere) {
+            setPending(entry);
+        }
+    }
+
+    function runCommand(entry, command) {
+        if (entry.available !== true || !hasCommand(entry, command)) {
+            return;
+        }
+        if (needsConfirmation(entry, command)) {
+            showConfirmation(entry, command);
+        } else {
+            sendCommand(entry, command);
+        }
+    }
+
+    // --------- Menü und Rückfrage ---------
+
+    function actionButton(command, cancel) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = cancel ? "action cancel" : "action";
+        if (!cancel) {
+            const color = validColor(command.color);
+            if (color !== "") {
+                button.style.setProperty("--action-color", color);
+            }
+            const icon = document.createElement("span");
+            icon.className = "action-icon";
+            icon.append(iconElement(command.icon, "lock"));
+            button.append(icon);
+        }
+        const caption = document.createElement("span");
+        caption.textContent = cancel ? translate("Cancel") : String(command.caption);
+        button.append(caption);
+        return button;
+    }
+
+    function openOverlay(entry, title, text, buttons) {
+        overlayEntryId = entry.id;
+        overlayTitle.textContent = title;
+        overlayText.textContent = text;
+        overlayText.hidden = text === "";
+        overlayActions.replaceChildren(...buttons);
+        const cancel = actionButton(null, true);
+        cancel.addEventListener("click", closeOverlay);
+        overlayActions.append(cancel);
+        overlay.setAttribute("aria-label", title);
+        overlay.hidden = false;
+        grid.dataset.dimmed = "true";
+        (buttons[0] || cancel).focus({ preventScroll: true });
+    }
+
+    function closeOverlay() {
+        overlay.hidden = true;
+        overlayEntryId = null;
+        overlayActions.replaceChildren();
+        delete grid.dataset.dimmed;
+    }
+
+    function showMenu(entry) {
+        const buttons = (entry.commands || []).map((command) => {
+            const button = actionButton(command, false);
+            button.addEventListener("click", () => {
+                closeOverlay();
+                runCommand(entry, command.value);
+            });
+            return button;
+        });
+        openOverlay(entry, String(entry.label), String(entry.text || ""), buttons);
+    }
+
+    function showConfirmation(entry, value) {
+        const command = findCommand(entry, value);
+        if (!command) {
+            return;
+        }
+        const button = actionButton(command, false);
+        button.addEventListener("click", () => {
+            closeOverlay();
+            sendCommand(entry, value);
+        });
+        openOverlay(entry, String(entry.label), String(command.caption) + "?", [button]);
+    }
+
+    overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) {
+            closeOverlay();
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !overlay.hidden) {
+            closeOverlay();
+        }
+    });
+
+    // --------- Darstellung ---------
+
+    // Zustand eines Schlosses anzeigen; Icon nur bei Änderung austauschen (icons.js ersetzt das <i> durch ein SVG).
+    function applyEntryState(item) {
+        const { cell, button, more, graphic, statusLabel, entry } = item;
+        const available = entry.available === true;
+        const stateName = available && typeof entry.state === "string" ? entry.state : "unknown";
+        cell.dataset.state = stateName;
+        button.disabled = !available;
+        if (more) {
+            more.disabled = !available;
+        }
+        const color = validColor(entry.color);
+        if (color !== "") {
+            cell.style.setProperty("--own-color", color);
+        } else {
+            cell.style.removeProperty("--own-color");
+        }
+        const icon = validIcon(entry.icon, "lock");
+        if (graphic.dataset.icon !== icon) {
+            graphic.dataset.icon = icon;
+            graphic.replaceChildren(iconElement(icon, "lock"));
+        }
+        const text = available ? String(entry.text || "") : translate("Not available");
+        if (statusLabel) {
+            statusLabel.textContent = text;
+        }
+        const title = String(entry.label || "") + (text !== "" ? " – " + text : "");
+        button.title = title;
+        button.setAttribute("aria-label", title);
+        cell.setAttribute("aria-busy", String(pendingById.has(entry.id)));
+    }
+
+    function renderFull() {
+        const entries = Array.isArray(state.entries) ? state.entries : [];
+        const showStatus = state.showStatus === true;
+        closeOverlay();
+        grid.replaceChildren();
+        cellsById = new Map();
+        grid.dataset.count = String(entries.length);
+        grid.dataset.lines = String((entries.some((entry) => entry.showLabel !== false) ? 1 : 0) + (showStatus ? 1 : 0));
+        layoutGrid();
+
+        if (entries.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "empty";
+            empty.textContent = translate("No locks configured");
+            grid.append(empty);
+            return;
+        }
+
+        entries.forEach((entry) => {
+            const cell = document.createElement("div");
+            cell.className = "cell";
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "lock";
+            const face = document.createElement("span");
+            face.className = "face";
+            const graphic = document.createElement("span");
+            graphic.className = "graphic";
+            face.append(graphic);
+            button.append(face);
+            if (entry.showLabel !== false) {
+                const label = document.createElement("span");
+                label.className = "label";
+                label.textContent = String(entry.label || "");
+                button.append(label);
+            }
+            let statusLabel = null;
+            if (showStatus) {
+                statusLabel = document.createElement("span");
+                statusLabel.className = "label status-text";
+                button.append(statusLabel);
+            }
+            cell.append(button);
+
+            let more = null;
+            if (hasMenu(entry)) {
+                more = document.createElement("button");
+                more.type = "button";
+                more.className = "more";
+                more.title = translate("More commands");
+                more.setAttribute("aria-label", translate("More commands"));
+                more.setAttribute("aria-haspopup", "dialog");
+                more.append(chevronElement());
+                more.addEventListener("click", () => showMenu(item.entry));
+                cell.append(more);
+            }
+
+            const item = { cell, button, more, graphic, statusLabel, entry };
+            button.addEventListener("click", () => {
+                pressFeedback(button);
+                runCommand(item.entry, toggleCommand(item.entry));
+            });
+            applyEntryState(item);
+            if (pendingById.has(entry.id)) {
+                cell.dataset.pending = "true";
+            }
+            const list = cellsById.get(entry.id) || [];
+            list.push(item);
+            cellsById.set(entry.id, list);
+            grid.append(cell);
+        });
+    }
+
+    // Nur die Zustände übernehmen, wenn sich Aufbau und Beschriftungen nicht geändert haben (Menü bleibt offen).
+    function applyStates(entries) {
+        const seen = new Map();
+        entries.forEach((entry) => {
+            const index = seen.get(entry.id) || 0;
+            seen.set(entry.id, index + 1);
+            const item = (cellsById.get(entry.id) || [])[index];
+            if (!item) {
+                return;
+            }
+            item.entry = entry;
+            const pending = pendingById.get(entry.id);
+            if (pending && (entry.status !== pending.status || entry.available !== true)) {
+                clearPending(entry.id);
+            }
+            applyEntryState(item);
+        });
+        if (overlayEntryId !== null) {
+            const current = entries.find((entry) => entry.id === overlayEntryId);
+            if (!current || current.available !== true) {
+                closeOverlay();
+            }
+        }
+    }
+
+    function computeStructureKey(message) {
+        const entries = Array.isArray(message.entries) ? message.entries : [];
+        return JSON.stringify([
+            message.showStatus === true,
+            entries.map((entry) => [entry.id, entry.label, entry.showLabel, entry.confirmOpen, entry.confirmUnlock, entry.commands])
+        ]);
+    }
+
+    function handleMessage(data) {
+        let message = data;
+        if (typeof message === "string") {
+            try {
+                message = JSON.parse(message);
+            } catch (error) {
+                return;
+            }
+        }
+        if (!message || typeof message !== "object" || Array.isArray(message)) {
+            return;
+        }
+        if (message.type === "failed") {
+            showFailed(message.id);
+        } else if (message.type === "full") {
+            if (!Array.isArray(message.entries)) {
+                message.entries = [];
+            }
+            const key = computeStructureKey(message);
+            state = message;
+            if (key === structureKey) {
+                applyStates(message.entries);
+            } else {
+                structureKey = key;
+                renderFull();
+            }
+        }
+    }
+
+    new ResizeObserver(layoutGrid).observe(grid);
+    handleMessage(__QUICKLOCK_INITIAL_STATE__);
+</script>

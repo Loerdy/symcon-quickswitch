@@ -1,0 +1,14 @@
+{
+    "id": "{1C6242D2-94AD-03EB-F761-EED556D56353}",
+    "name": "QuickLock",
+    "type": 3,
+    "vendor": "",
+    "aliases": [
+        "Quick Lock"
+    ],
+    "url": "https://github.com/Loerdy/symcon-quickswitch/blob/main/QuickLock/README.md",
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "QLK"
+}
