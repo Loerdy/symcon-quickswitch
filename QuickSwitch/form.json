@@ -131,7 +131,8 @@
                                 "validVariableTypes": [
                                     0,
                                     1,
-                                    2
+                                    2,
+                                    3
                                 ],
                                 "requiredAction": 1
                             }
@@ -149,7 +150,7 @@
                 },
                 {
                     "type": "Label",
-                    "caption": "Actuators with additional variables get a small arrow on their button. It opens a menu with one row per additional variable, in the order of this list. The control depends on the variable: Boolean = switch, enumeration presentation (or profile with associations) = buttons, slider presentation (or profile with value range) = slider. Without a label, the name of the variable is used."
+                    "caption": "Actuators with additional variables get a small arrow on their button. It opens a menu with one row per additional variable, in the order of this list. The control depends on the variable: Boolean = switch, enumeration presentation (or profile with associations, also for strings) = buttons, slider presentation (or profile with value range) = slider, color presentation (RGB) = color dots and hue slider, string without enumeration = text field. Without a label, the name of the variable is used."
                 }
             ]
         },

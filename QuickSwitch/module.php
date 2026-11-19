@@ -16,6 +16,10 @@ class QuickSwitch extends IPSModule
     private const STATUS_INVALID_ENTRY = 201;
     private const STATUS_INVALID_LIST = 202;
     private const STATUS_INVALID_EXTRA = 203;
+    // Obergrenze für Texte aus dem Textfeld des Pfeil-Menüs
+    private const TEXT_MAX_BYTES = 1024;
+    // Farbtupfer, wenn die Farb-Darstellung keine Standardwerte hat
+    private const DEFAULT_COLORS = ['#FF3B30', '#FF9500', '#FFCC00', '#34C759', '#00BCD4', '#007AFF', '#AF52DE', '#E91E63'];
 
     public function Create(): void
     {
@@ -322,8 +326,10 @@ class QuickSwitch extends IPSModule
     }
 
     /**
-     * Bedienelement nach Variablentyp und Darstellung: Boolean => Umschalter, Aufzählung => Buttons,
-     * Schieberegler bzw. Profil mit Wertebereich => Schieberegler. Andere Variablen werden nicht unterstützt.
+     * Bedienelement nach Variablentyp und Darstellung: Boolean => Umschalter, Aufzählung (auch String) => Buttons,
+     * String ohne Aufzählung => Textfeld, Schieberegler bzw. Profil mit Wertebereich => Schieberegler,
+     * Farbe (RGB-Integer) => Farbtupfer und Farbton-Regler.
+     * Andere Variablen werden nicht unterstützt.
      */
     private function extraControl(int $variableId): ?array
     {
@@ -334,37 +340,67 @@ class QuickSwitch extends IPSModule
         if ($type === VARIABLETYPE_BOOLEAN) {
             return ['type' => 'toggle'];
         }
-        if ($type !== VARIABLETYPE_INTEGER && $type !== VARIABLETYPE_FLOAT) {
-            return null;
+        $presets = $this->colorPresets($variableId);
+        if ($presets !== null) {
+            return ['type' => 'color', 'presets' => $presets !== [] ? $presets : self::DEFAULT_COLORS];
         }
         $options = $this->enumerationOptions($variableId);
         if ($options !== []) {
             return ['type' => 'buttons', 'options' => $options];
         }
+        if ($type === VARIABLETYPE_STRING) {
+            return ['type' => 'text'];
+        }
         $range = $this->sliderRange($variableId);
         return $range !== null ? ['type' => 'slider'] + $range : null;
     }
 
-    // Prüft einen Wert aus der Kachel gegen das Bedienelement und wandelt ihn in den Variablentyp; null = ungültig.
-    private function extraValue(array $control, int $variableId, mixed $value): bool|int|float|null
+    // Auswahlwert, der dem Wert entspricht: Texte exakt, Zahlen mit Rundungstoleranz.
+    private function matchingOption(array $control, mixed $value): ?array
     {
-        if ($control['type'] === 'toggle') {
-            return is_bool($value) ? $value : null;
-        }
-        if (!is_int($value) && !is_float($value)) {
-            return null;
-        }
-        $isInteger = IPS_GetVariable($variableId)['VariableType'] === VARIABLETYPE_INTEGER;
-        if ($control['type'] === 'buttons') {
-            foreach ($control['options'] as $option) {
-                if (abs($option['value'] - $value) < 1e-9) {
-                    return $isInteger ? (int) round($option['value']) : (float) $option['value'];
-                }
+        foreach ($control['options'] ?? [] as $option) {
+            if (is_string($option['value'])
+                ? $option['value'] === $value
+                : (is_int($value) || is_float($value)) && abs($option['value'] - $value) < 1e-9) {
+                return $option;
             }
-            return null;
         }
-        $value = max($control['min'], min($control['max'], (float) $value));
-        return $isInteger ? (int) round($value) : $value;
+        return null;
+    }
+
+    // Prüft einen Wert aus der Kachel gegen das Bedienelement und wandelt ihn in den Variablentyp; null = ungültig.
+    private function extraValue(array $control, int $variableId, mixed $value): bool|int|float|string|null
+    {
+        $type = IPS_GetVariable($variableId)['VariableType'];
+        switch ($control['type']) {
+            case 'toggle':
+                return is_bool($value) ? $value : null;
+
+            case 'text':
+                return is_string($value) && strlen($value) <= self::TEXT_MAX_BYTES ? $value : null;
+
+            case 'buttons':
+                $option = $this->matchingOption($control, $value);
+                if ($option === null) {
+                    return null;
+                }
+                return match ($type) {
+                    VARIABLETYPE_INTEGER => (int) round($option['value']),
+                    VARIABLETYPE_FLOAT   => (float) $option['value'],
+                    default              => (string) $option['value']
+                };
+
+            case 'color':
+                return is_int($value) && $value >= 0 && $value <= 0xFFFFFF ? $value : null;
+
+            case 'slider':
+                if (!is_int($value) && !is_float($value)) {
+                    return null;
+                }
+                $value = max($control['min'], min($control['max'], (float) $value));
+                return $type === VARIABLETYPE_INTEGER ? (int) round($value) : $value;
+        }
+        return null;
     }
 
     private function setExtra(string $payload): void
@@ -417,13 +453,18 @@ class QuickSwitch extends IPSModule
         } catch (Throwable $e) {
             $text = '';
         }
-        // Ohne passende Darstellung liefert Symcon nur den Rohwert; dann eigener Text.
+        // Ohne passende Darstellung liefert Symcon nur den Rohwert; dann eigener Text. Ein Wert, der in keiner
+        // Auswahl vorkommt (z. B. -1 = keine Aktion), bleibt leer.
         $raw = is_bool($value) ? ['0', '1', 'true', 'false'] : [(string) $value];
-        if ($text === '' || $text === '-' || in_array($text, $raw, true)) {
+        if ($control['type'] === 'color') {
+            // Farben immer als #RRGGBB; Werte außerhalb von RGB (z. B. -1 = keine Farbe) bleiben leer.
+            $text = $this->hexColor($value);
+        } elseif ($text === '' || $text === '-' || in_array($text, $raw, true)) {
             $text = match ($control['type']) {
-                'toggle' => $this->Translate($value ? 'On' : 'Off'),
-                'slider' => $control['prefix'] . number_format((float) $value, $control['digits'], ',', '') . $control['suffix'],
-                default  => (string) $value
+                'toggle'  => $this->Translate($value ? 'On' : 'Off'),
+                'slider'  => $control['prefix'] . number_format((float) $value, $control['digits'], ',', '') . $control['suffix'],
+                'buttons' => $this->matchingOption($control, $value)['caption'] ?? '',
+                default   => (string) $value
             };
         }
         return ['id' => $variableId, 'available' => true, 'value' => $value, 'text' => $text];

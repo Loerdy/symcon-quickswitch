@@ -27,10 +27,12 @@ Kachel für die Kachel-Visualisierung von IP-Symcon, über die verknüpfte Aktor
   | Variable | Bedienelement |
   | --- | --- |
   | Boolean | Umschalter An/Aus |
-  | Integer/Float mit Darstellung Aufzählung (bzw. Profil mit Assoziationen) | Buttons mit Beschriftung, Icon und Farbe aus der Darstellung; der aktuelle Wert ist markiert |
+  | Integer/Float/String mit Darstellung Aufzählung (bzw. Profil mit Assoziationen) | Buttons mit Beschriftung, Icon und Farbe aus der Darstellung; der aktuelle Wert ist markiert (z. B. Szenen) |
   | Integer/Float mit Darstellung Schieberegler (bzw. Profil mit Wertebereich) | Schieberegler mit Min, Max und Schrittweite aus der Darstellung; der Wert wird beim Loslassen gesetzt |
+  | Integer mit Darstellung Farbe (Kodierung RGB) | Farbtupfer mit den Standardwerten der Darstellung (ohne Standardwerte feste Grundfarben) und Farbton-Regler; die Helligkeit regelt eine eigene Zusatzvariable |
+  | String ohne Aufzählung | Textfeld; der Text wird mit Enter bzw. beim Verlassen des Feldes gesetzt (max. 1024 Byte) |
 
-  Andere Variablen (z. B. Strings, Farbe) werden noch nicht unterstützt und im Menü deaktiviert angezeigt.
+  Hat die Variable einen Wert, der in der Aufzählung nicht vorkommt (z. B. -1 = keine Aktion), ist kein Button markiert und der Wert bleibt leer. Andere Variablen (z. B. Farbe in anderer Kodierung als RGB) werden nicht unterstützt und im Menü deaktiviert angezeigt.
 - Icons und Bilder skalieren mit der Größe der Kachel; die Anordnung wird automatisch so gewählt, dass die Schaltflächen möglichst groß sind.
 - Zustandsänderungen von außen (z. B. Schalter an der Wand) werden sofort angezeigt, ohne Polling.
 
@@ -66,7 +68,7 @@ __Konfigurationsseite__:
 | ↳ Bei Alle an/aus schalten | Ob der Aktor vom Button Alle an/aus geschaltet wird |
 | Zusatzvariablen | Liste der Zusatzvariablen für das Pfeil-Menü; Reihenfolge = Reihenfolge im Menü |
 | ↳ Aktor | Variable eines Aktors aus der Liste oben, zu dem die Zusatzvariable gehört |
-| ↳ Zusatzvariable | Boolean-, Integer- oder Float-Variable mit Aktion |
+| ↳ Zusatzvariable | Boolean-, Integer-, Float- oder String-Variable mit Aktion |
 | ↳ Beschriftung | Text im Menü; leer = Name der Variable |
 | Button Alle an/aus anzeigen | Zeigt den Button an erster Stelle der Kachel |
 | Beschriftung | Eigene Beschriftung des Buttons; leer = „Alle an“ bzw. „Alle aus“ je nach Zustand |

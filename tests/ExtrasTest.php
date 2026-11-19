@@ -70,23 +70,120 @@ class ExtrasTest extends QuickSwitchTestCase
     public function testUnsupportedVariablesAreUnavailable(): void
     {
         $lamp = $this->createSwitch('Lamp');
-        $text = $this->createExtra(VARIABLETYPE_STRING, 'x');
         $plainInteger = $this->createExtra(VARIABLETYPE_INTEGER, 3);
         $withoutAction = $this->createExtra(VARIABLETYPE_BOOLEAN, false, null, false);
         $module = $this->createQuickSwitch([$this->entry($lamp)], false, null, [
-            $this->extraRow($lamp, $text),
             $this->extraRow($lamp, $plainInteger),
             $this->extraRow($lamp, $withoutAction)
         ]);
 
         $extras = $this->fullState($module)['entries'][0]['extras'];
 
-        $this->assertSame([false, false, false], array_column($extras, 'available'));
-        $this->assertSame([null, null, null], array_column($extras, 'control'));
+        $this->assertSame([false, false], array_column($extras, 'available'));
+        $this->assertSame([null, null], array_column($extras, 'control'));
         $this->assertSame(203, $this->instanceStatus($module));
     }
 
+    public function testStringVariablesGiveButtonsOrTextField(): void
+    {
+        $lamp = $this->createSwitch('Lamp');
+        $scene = $this->createExtra(VARIABLETYPE_STRING, 'relax', $this->enumeration([
+            ['Value' => 'relax', 'Caption' => 'Entspannen', 'IconActive' => false, 'IconValue' => '', 'Color' => -1],
+            ['Value' => '1', 'Caption' => 'Lesen', 'IconActive' => false, 'IconValue' => '', 'Color' => -1]
+        ]));
+        $note = $this->createExtra(VARIABLETYPE_STRING, 'Hallo');
+        $module = $this->createQuickSwitch([$this->entry($lamp)], false, null, [$this->extraRow($lamp, $scene), $this->extraRow($lamp, $note)]);
+
+        [$sceneExtra, $noteExtra] = $this->fullState($module)['entries'][0]['extras'];
+
+        // Auch numerisch aussehende Werte bleiben bei String-Variablen Texte.
+        $this->assertSame(['relax', '1'], array_column($sceneExtra['control']['options'], 'value'));
+        $this->assertSame(['buttons', 'relax', 'Entspannen'], [$sceneExtra['control']['type'], $sceneExtra['value'], $sceneExtra['text']]);
+        $this->assertSame(['type' => 'text'], $noteExtra['control']);
+        $this->assertSame(['Hallo', 'Hallo'], [$noteExtra['value'], $noteExtra['text']]);
+        $this->assertSame(IS_ACTIVE, $this->instanceStatus($module));
+    }
+
+    public function testColorGivesPresetsFromPresentation(): void
+    {
+        $lamp = $this->createSwitch('Lamp');
+        $color = $this->createExtra(VARIABLETYPE_INTEGER, 16007990, $this->color([16007990, 16761095, 10233776, 48340, 2201331, 15277667]));
+        $plain = $this->createExtra(VARIABLETYPE_INTEGER, -1, $this->color([]));
+        $module = $this->createQuickSwitch([$this->entry($lamp)], false, null, [$this->extraRow($lamp, $color), $this->extraRow($lamp, $plain)]);
+
+        [$colorExtra, $plainExtra] = $this->fullState($module)['entries'][0]['extras'];
+
+        $this->assertSame(['type' => 'color', 'presets' => ['#F44336', '#FFC107', '#9C27B0', '#00BCD4', '#2196F3', '#E91E63']], $colorExtra['control']);
+        $this->assertSame([16007990, '#F44336'], [$colorExtra['value'], $colorExtra['text']]);
+        // Ohne Standardwerte feste Grundfarben; -1 (keine Farbe) ohne Text
+        $this->assertCount(8, $plainExtra['control']['presets']);
+        $this->assertSame([-1, ''], [$plainExtra['value'], $plainExtra['text']]);
+        $this->assertSame(IS_ACTIVE, $this->instanceStatus($module));
+    }
+
+    public function testColorWithOtherEncodingIsNotSupported(): void
+    {
+        $lamp = $this->createSwitch('Lamp');
+        $color = $this->createExtra(VARIABLETYPE_INTEGER, 0, $this->color([255], 1));
+        $module = $this->createQuickSwitch([$this->entry($lamp)], false, null, [$this->extraRow($lamp, $color)]);
+
+        $this->assertNull($this->fullState($module)['entries'][0]['extras'][0]['control']);
+        $this->assertSame(203, $this->instanceStatus($module));
+    }
+
+    public function testColorValuesAreSetAndChecked(): void
+    {
+        $lamp = $this->createSwitch('Lamp');
+        $color = $this->createExtra(VARIABLETYPE_INTEGER, 0, $this->color([16007990]));
+        $module = $this->createQuickSwitch([$this->entry($lamp)], false, null, [$this->extraRow($lamp, $color)]);
+
+        // Außerhalb von RGB, Kommazahl und Text werden abgelehnt.
+        foreach ([0x1000000, -1, 255.5, '#FF0000'] as $invalid) {
+            $module->RequestAction('Extra', json_encode(['variable' => $color, 'value' => $invalid]));
+        }
+        $this->assertSame(0, GetValueInteger($color));
+
+        $module->RequestAction('Extra', json_encode(['variable' => $color, 'value' => 0xFF8800]));
+        $this->assertSame(0xFF8800, GetValueInteger($color));
+    }
+
+    public function testValueOutsideEnumerationHasNoText(): void
+    {
+        $lamp = $this->createSwitch('Lamp');
+        $vacuum = $this->createExtra(VARIABLETYPE_INTEGER, -1, $this->enumeration(self::VACUUM_OPTIONS));
+        $module = $this->createQuickSwitch([$this->entry($lamp)], false, null, [$this->extraRow($lamp, $vacuum)]);
+
+        $extra = $this->fullState($module)['entries'][0]['extras'][0];
+
+        $this->assertSame([-1, ''], [$extra['value'], $extra['text']]);
+    }
+
     // --------- Werte setzen ---------
+
+    public function testStringValuesAreSetAndChecked(): void
+    {
+        $lamp = $this->createSwitch('Lamp');
+        $scene = $this->createExtra(VARIABLETYPE_STRING, 'relax', $this->enumeration([
+            ['Value' => 'relax', 'Caption' => 'Entspannen'],
+            ['Value' => '1', 'Caption' => 'Lesen']
+        ]));
+        $note = $this->createExtra(VARIABLETYPE_STRING, '');
+        $module = $this->createQuickSwitch([$this->entry($lamp)], false, null, [$this->extraRow($lamp, $scene), $this->extraRow($lamp, $note)]);
+
+        // Zahl statt Text und unbekannte Szene werden abgelehnt.
+        $module->RequestAction('Extra', json_encode(['variable' => $scene, 'value' => 1]));
+        $module->RequestAction('Extra', json_encode(['variable' => $scene, 'value' => 'party']));
+        $this->assertSame('relax', GetValueString($scene));
+
+        $module->RequestAction('Extra', json_encode(['variable' => $scene, 'value' => '1']));
+        $this->assertSame('1', GetValueString($scene));
+
+        $module->RequestAction('Extra', json_encode(['variable' => $note, 'value' => 'Grüße & <Tschüss>']));
+        $this->assertSame('Grüße & <Tschüss>', GetValueString($note));
+
+        $module->RequestAction('Extra', json_encode(['variable' => $note, 'value' => str_repeat('x', 1025)]));
+        $this->assertSame('Grüße & <Tschüss>', GetValueString($note));
+    }
 
     public function testValuesAreSetThroughTheAction(): void
     {
@@ -205,6 +302,21 @@ class ExtrasTest extends QuickSwitchTestCase
         IPS_ApplyChanges($this->instanceID($module));
 
         $this->assertArrayNotHasKey($channel, $this->call($module, 'GetMessageList'));
+    }
+
+    // Farb-Darstellung wie bei der Lampe (Ausgabe von IPS_GetVariablePresentation)
+    private function color(array $presets, int $encoding = 0): array
+    {
+        return [
+            'PRESENTATION'       => VARIABLE_PRESENTATION_COLOR,
+            'COLOR_CURVE'        => 0,
+            'COLOR_SPACE'        => 1,
+            'CUSTOM_COLOR_CURVE' => '[]',
+            'CUSTOM_COLOR_SPACE' => '[{"x":0.64,"y":0.33},{"x":0.3,"y":0.6},{"x":0.15,"y":0.06},{"x":0.3127,"y":0.329}]',
+            'ENCODING'           => $encoding,
+            'PRESET_VALUES'      => json_encode(array_map(fn ($color) => ['Color' => $color], $presets)),
+            'SELECTION'          => 0
+        ];
     }
 
     private function enumeration(array $options): array

@@ -40,12 +40,14 @@ trait QuickSwitchPresentation
     }
 
     /**
-     * Auswahlwerte einer Aufzählung (auch über eine Vorlage) oder der Assoziationen des Profils.
+     * Auswahlwerte einer Aufzählung (auch über eine Vorlage) oder der Assoziationen des Profils. Bei String-Variablen
+     * bleiben die Werte Texte, sonst sind es Zahlen.
      *
-     * @return array<int, array{value: int|float, caption: string, icon: string, color: string}>
+     * @return array<int, array{value: int|float|string, caption: string, icon: string, color: string}>
      */
     private function enumerationOptions(int $variableId): array
     {
+        $isString = IPS_VariableExists($variableId) && IPS_GetVariable($variableId)['VariableType'] === VARIABLETYPE_STRING;
         $presentation = $this->presentationParameters($variableId);
         $profile = $this->presentationProfile($presentation);
         if ($profile !== null) {
@@ -65,11 +67,12 @@ trait QuickSwitchPresentation
 
         $options = [];
         foreach ($rows as $row) {
-            if (!is_array($row) || !is_numeric($row['Value'] ?? null)) {
+            $value = is_array($row) ? ($row['Value'] ?? null) : null;
+            if ($isString ? !is_scalar($value) || is_bool($value) : !is_numeric($value)) {
                 continue;
             }
             $options[] = [
-                'value'   => $row['Value'] + 0,
+                'value'   => $isString ? (string) $value : $value + 0,
                 'caption' => is_string($row['Caption'] ?? null) ? $row['Caption'] : '',
                 'icon'    => ($row['IconActive'] ?? false) === true && is_string($row['IconValue'] ?? null) && preg_match('/^[a-z0-9-]+$/', $row['IconValue']) === 1 ? $row['IconValue'] : '',
                 'color'   => $this->hexColor($row['Color'] ?? -1)
@@ -113,6 +116,33 @@ trait QuickSwitchPresentation
             'prefix' => is_string($prefix) ? $prefix : '',
             'suffix' => is_string($suffix) ? $suffix : ''
         ];
+    }
+
+    /**
+     * Standardfarben einer Farb-Darstellung mit Kodierung RGB (ENCODING 0, Integer-Variable). null, wenn die Variable
+     * keine solche Darstellung hat; andere Kodierungen werden nicht unterstützt.
+     *
+     * @return array<int, string>|null Farben als #RRGGBB
+     */
+    private function colorPresets(int $variableId): ?array
+    {
+        if (!IPS_VariableExists($variableId) || IPS_GetVariable($variableId)['VariableType'] !== VARIABLETYPE_INTEGER) {
+            return null;
+        }
+        $presentation = $this->presentationParameters($variableId);
+        if (($presentation['PRESENTATION'] ?? '') !== VARIABLE_PRESENTATION_COLOR || (int) ($presentation['ENCODING'] ?? 0) !== 0) {
+            return null;
+        }
+        $raw = $presentation['PRESET_VALUES'] ?? null;
+        $rows = is_string($raw) ? json_decode($raw, true) : $raw;
+        $presets = [];
+        foreach (is_array($rows) ? $rows : [] as $row) {
+            $color = is_array($row) ? $this->hexColor($row['Color'] ?? -1) : '';
+            if ($color !== '' && !in_array($color, $presets, true)) {
+                $presets[] = $color;
+            }
+        }
+        return $presets;
     }
 
     private function hexColor(mixed $color): string
