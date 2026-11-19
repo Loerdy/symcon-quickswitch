@@ -429,6 +429,8 @@
     const overlayActions = document.getElementById("overlay-actions");
     // Variablen-ID => Aktualisierungsfunktionen der Zeilen im geöffneten Menü
     let extraRows = new Map();
+    // So lange zeigt das Menü einen gewählten Wert, wenn die Variable ihn nicht bestätigt.
+    const PREVIEW_TIMEOUT = 10000;
 
     function validIcon(name) {
         return typeof name === "string" && /^[a-z0-9-]+$/.test(name) ? name : DEFAULT_ICON;
@@ -698,6 +700,11 @@
         return typeof value === "string" && /^#[0-9A-Fa-f]{6}$/.test(value);
     }
 
+    // Geräte melden eine gesetzte Farbe oft leicht verändert zurück (z. B. nach Umrechnung in den Farbraum der Lampe).
+    function nearColor(a, b) {
+        return [16, 8, 0].every((shift) => Math.abs(((a >> shift) & 255) - ((b >> shift) & 255)) <= 8);
+    }
+
     function rgbToHex(rgb) {
         return "#" + rgb.toString(16).toUpperCase().padStart(6, "0");
     }
@@ -825,9 +832,13 @@
                 dot.style.background = hex;
                 dot.title = hex;
                 dot.setAttribute("aria-label", hex);
-                dot.addEventListener("click", () => sendExtra(extra, parseInt(hex.slice(1), 16)));
+                const value = parseInt(hex.slice(1), 16);
+                dot.addEventListener("click", () => {
+                    preview(value);
+                    sendExtra(extra, value);
+                });
                 dots.append(dot);
-                return { dot, value: parseInt(hex.slice(1), 16) };
+                return { dot, value };
             });
             const hue = document.createElement("input");
             hue.type = "range";
@@ -837,23 +848,45 @@
             hue.step = "1";
             hue.setAttribute("aria-label", String(extra.label || ""));
             let dragging = false;
+            let previewTimer = null;
+            // Zeigt eine Farbe in Kästchen, Hex-Wert, Tupfern und Regler (Regler nicht während des Ziehens).
+            const showColor = (color) => {
+                const hasColor = Number.isInteger(color) && color >= 0 && color <= 0xFFFFFF;
+                swatch.style.background = hasColor ? rgbToHex(color) : "transparent";
+                valueText.textContent = hasColor ? rgbToHex(color) : "";
+                presets.forEach(({ dot, value }) => (dot.dataset.active = String(hasColor && nearColor(value, color))));
+                if (!dragging && hasColor) {
+                    hue.value = String(rgbToHue(color));
+                }
+            };
+            // Gewählte Farbe sofort zeigen; gilt nur bis zur Rückmeldung der Variable, höchstens PREVIEW_TIMEOUT.
+            const preview = (color) => {
+                showColor(color);
+                window.clearTimeout(previewTimer);
+                previewTimer = window.setTimeout(() => {
+                    previewTimer = null;
+                    showColor(extra.available === true ? extra.value : null);
+                }, PREVIEW_TIMEOUT);
+            };
             hue.addEventListener("input", () => {
                 dragging = true;
-                const color = hueToRgb(Number(hue.value));
-                swatch.style.background = rgbToHex(color);
-                valueText.textContent = rgbToHex(color);
+                showColor(hueToRgb(Number(hue.value)));
             });
             hue.addEventListener("change", () => {
                 dragging = false;
-                sendExtra(extra, hueToRgb(Number(hue.value)));
+                const color = hueToRgb(Number(hue.value));
+                preview(color);
+                sendExtra(extra, color);
             });
             row.append(dots, hue);
             updateControl = () => {
-                const hasColor = Number.isInteger(extra.value) && extra.value >= 0 && extra.value <= 0xFFFFFF;
-                swatch.style.background = hasColor ? rgbToHex(extra.value) : "transparent";
-                presets.forEach(({ dot, value }) => (dot.dataset.active = String(hasColor && value === extra.value)));
-                if (!dragging && hasColor) {
-                    hue.value = String(rgbToHue(extra.value));
+                window.clearTimeout(previewTimer);
+                previewTimer = null;
+                if (extra.available === true) {
+                    showColor(extra.value);
+                } else {
+                    swatch.style.background = "transparent";
+                    presets.forEach(({ dot }) => (dot.dataset.active = "false"));
                 }
             };
         } else if (control && control.type === "slider") {
@@ -864,6 +897,7 @@
             slider.step = String(control.step);
             slider.setAttribute("aria-label", String(extra.label || ""));
             let dragging = false;
+            let previewTimer = null;
             slider.addEventListener("input", () => {
                 dragging = true;
                 valueText.textContent = formatSlider(control, slider.value);
@@ -871,10 +905,20 @@
             slider.addEventListener("change", () => {
                 dragging = false;
                 sendExtra(extra, Number(slider.value));
+                // Ohne Bestätigung durch die Variable zurück auf den tatsächlichen Wert
+                window.clearTimeout(previewTimer);
+                previewTimer = window.setTimeout(() => {
+                    previewTimer = null;
+                    update();
+                }, PREVIEW_TIMEOUT);
             });
             row.append(slider);
             updateControl = () => {
-                if (!dragging && typeof extra.value === "number") {
+                window.clearTimeout(previewTimer);
+                previewTimer = null;
+                if (dragging) {
+                    valueText.textContent = formatSlider(control, slider.value);
+                } else if (typeof extra.value === "number") {
                     slider.value = String(extra.value);
                 }
             };
@@ -922,16 +966,22 @@
             if (!item || typeof item !== "object") {
                 return;
             }
+            // Die Kachel erhält bei jeder Änderung alle Werte; Zeilen nur bei tatsächlicher Änderung aktualisieren,
+            // damit eine laufende Vorschau nicht durch unveränderte Werte anderer Variablen verworfen wird.
+            let changed = false;
             entries.forEach((entry) => {
                 (Array.isArray(entry.extras) ? entry.extras : []).forEach((extra) => {
                     if (extra.id === item.id) {
+                        changed = changed || extra.available !== (item.available === true) || extra.value !== item.value || extra.text !== item.text;
                         extra.available = item.available === true;
                         extra.value = item.value;
                         extra.text = item.text;
                     }
                 });
             });
-            (extraRows.get(item.id) || []).forEach((update) => update());
+            if (changed) {
+                (extraRows.get(item.id) || []).forEach((update) => update());
+            }
         });
     }
 
