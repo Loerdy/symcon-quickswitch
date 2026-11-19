@@ -97,6 +97,64 @@
         },
         {
             "type": "ExpansionPanel",
+            "caption": "Additional variables (arrow menu)",
+            "items": [
+                {
+                    "type": "List",
+                    "name": "Extras",
+                    "caption": "Additional variables",
+                    "rowCount": 8,
+                    "add": true,
+                    "delete": true,
+                    "changeOrder": true,
+                    "columns": [
+                        {
+                            "caption": "Actuator (variable from the list above)",
+                            "name": "switchVariable",
+                            "width": "280px",
+                            "add": 0,
+                            "edit": {
+                                "type": "SelectVariable",
+                                "validVariableTypes": [
+                                    0
+                                ],
+                                "requiredAction": 1
+                            }
+                        },
+                        {
+                            "caption": "Additional variable (with action)",
+                            "name": "variable",
+                            "width": "280px",
+                            "add": 0,
+                            "edit": {
+                                "type": "SelectVariable",
+                                "validVariableTypes": [
+                                    0,
+                                    1,
+                                    2
+                                ],
+                                "requiredAction": 1
+                            }
+                        },
+                        {
+                            "caption": "Label (optional)",
+                            "name": "label",
+                            "width": "auto",
+                            "add": "",
+                            "edit": {
+                                "type": "ValidationTextBox"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "Label",
+                    "caption": "Actuators with additional variables get a small arrow on their button. It opens a menu with one row per additional variable, in the order of this list. The control depends on the variable: Boolean = switch, enumeration presentation (or profile with associations) = buttons, slider presentation (or profile with value range) = slider. Without a label, the name of the variable is used."
+                }
+            ]
+        },
+        {
+            "type": "ExpansionPanel",
             "caption": "All on/off button",
             "items": [
                 {
@@ -132,6 +190,11 @@
             "code": 202,
             "icon": "error",
             "caption": "The list of actuators could not be read."
+        },
+        {
+            "code": 203,
+            "icon": "error",
+            "caption": "At least one additional variable is invalid (actuator not in the list, variable missing, without action or not supported) or the list could not be read. See the debug output."
         }
     ]
 }

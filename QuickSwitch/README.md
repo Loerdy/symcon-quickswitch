@@ -22,6 +22,15 @@ Kachel für die Kachel-Visualisierung von IP-Symcon, über die verknüpfte Aktor
 - Optionale Beschriftung unter der Grafik.
 - Antippen schaltet den Aktor um (über die Aktion der Variable, wie in der Visualisierung).
 - Optionaler Button **Alle an/aus**, immer an erster Stelle: Ist mindestens ein berücksichtigter Aktor an, werden alle berücksichtigten Aktoren ausgeschaltet, sonst eingeschaltet. Pro Aktor einstellbar, ob er berücksichtigt wird.
+- **Zusatzvariablen (Pfeil-Menü):** Aktoren können beliebig viele Zusatzvariablen erhalten (z. B. Helligkeit einer Lampe, Befehle eines Saugroboters). Ihr Button bekommt dann einen kleinen Pfeil, der ein Menü mit einer Zeile je Zusatzvariable öffnet. Das Bedienelement richtet sich nach der Variable:
+
+  | Variable | Bedienelement |
+  | --- | --- |
+  | Boolean | Umschalter An/Aus |
+  | Integer/Float mit Darstellung Aufzählung (bzw. Profil mit Assoziationen) | Buttons mit Beschriftung, Icon und Farbe aus der Darstellung; der aktuelle Wert ist markiert |
+  | Integer/Float mit Darstellung Schieberegler (bzw. Profil mit Wertebereich) | Schieberegler mit Min, Max und Schrittweite aus der Darstellung; der Wert wird beim Loslassen gesetzt |
+
+  Andere Variablen (z. B. Strings, Farbe) werden noch nicht unterstützt und im Menü deaktiviert angezeigt.
 - Icons und Bilder skalieren mit der Größe der Kachel; die Anordnung wird automatisch so gewählt, dass die Schaltflächen möglichst groß sind.
 - Zustandsänderungen von außen (z. B. Schalter an der Wand) werden sofort angezeigt, ohne Polling.
 
@@ -55,15 +64,21 @@ __Konfigurationsseite__:
 | ↳ Bild An | Optionales Medienobjekt (JPEG/PNG, max. 512 KB); ersetzt das Icon |
 | ↳ Bild Aus | Optionales Medienobjekt für den Zustand Aus; ohne Aus-Bild wird das An-Bild grau dargestellt |
 | ↳ Bei Alle an/aus schalten | Ob der Aktor vom Button Alle an/aus geschaltet wird |
+| Zusatzvariablen | Liste der Zusatzvariablen für das Pfeil-Menü; Reihenfolge = Reihenfolge im Menü |
+| ↳ Aktor | Variable eines Aktors aus der Liste oben, zu dem die Zusatzvariable gehört |
+| ↳ Zusatzvariable | Boolean-, Integer- oder Float-Variable mit Aktion |
+| ↳ Beschriftung | Text im Menü; leer = Name der Variable |
 | Button Alle an/aus anzeigen | Zeigt den Button an erster Stelle der Kachel |
 | Beschriftung | Eigene Beschriftung des Buttons; leer = „Alle an“ bzw. „Alle aus“ je nach Zustand |
 | Icon | Icon des Buttons |
 
 Ist ein Eintrag ungültig (Variable gelöscht, kein Boolean oder ohne Aktion), zeigt die Instanz einen Fehlerstatus. Der Eintrag wird in der Kachel deaktiviert dargestellt; die übrigen Einträge bleiben bedienbar.
 
+Ist eine Zusatzvariable ungültig (Aktor nicht in der Liste, Variable gelöscht, ohne Aktion oder nicht unterstützt), zeigt die Instanz ebenfalls einen Fehlerstatus; die Zeile im Menü ist deaktiviert.
+
 ### 5. Statusvariablen und Profile
 
-Das Modul legt keine Statusvariablen und keine Profile an. Die verknüpften Variablen werden nur gelesen und über ihre Aktion geschaltet; die eigenen Bilder werden nur gelesen.
+Das Modul legt keine Statusvariablen und keine Profile an. Die verknüpften Variablen und Zusatzvariablen werden nur gelesen und über ihre Aktion geschaltet bzw. gesetzt; die eigenen Bilder werden nur gelesen.
 
 ### 6. Visualisierung
 
@@ -79,4 +94,7 @@ IPS_RequestAction($InstanzID, 'Toggle', 12345);
 
 // Alle an/aus auslösen (nur wenn der Button aktiviert ist)
 IPS_RequestAction($InstanzID, 'All', true);
+
+// Zusatzvariable 23456 setzen (nur zugeordnete Zusatzvariablen, Wert wird gegen das Bedienelement geprüft)
+IPS_RequestAction($InstanzID, 'Extra', json_encode(['variable' => 23456, 'value' => 75]));
 ```

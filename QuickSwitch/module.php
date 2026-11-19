@@ -3,22 +3,26 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../libs/QuickSwitchMediaImage.php';
+require_once __DIR__ . '/../libs/QuickSwitchPresentation.php';
 
 class QuickSwitch extends IPSModule
 {
     use QuickSwitchMediaImage;
+    use QuickSwitchPresentation;
 
     private const VARIABLE_MESSAGES = [VM_UPDATE, VM_DELETE];
     private const MEDIA_MESSAGES = [MM_UPDATE, MM_CHANGEFILE, MM_DELETE];
     private const DEFAULT_ICON = 'power-off';
     private const STATUS_INVALID_ENTRY = 201;
     private const STATUS_INVALID_LIST = 202;
+    private const STATUS_INVALID_EXTRA = 203;
 
     public function Create(): void
     {
         parent::Create();
 
         $this->RegisterPropertyString('Entries', '[]');
+        $this->RegisterPropertyString('Extras', '[]');
         $this->RegisterPropertyBoolean('ShowAllButton', false);
         $this->RegisterPropertyString('AllLabel', '');
         $this->RegisterPropertyString('AllIcon', self::DEFAULT_ICON);
@@ -37,7 +41,7 @@ class QuickSwitch extends IPSModule
         }
 
         $entries = $this->readEntries();
-        $this->registerObjectMessages($entries ?? []);
+        $this->registerObjectMessages($entries ?? [], $this->readExtras() ?? []);
         $this->SetStatus($this->configurationStatus($entries));
         $this->updateVisualization();
     }
@@ -99,6 +103,10 @@ class QuickSwitch extends IPSModule
                 $this->switchAll();
                 break;
 
+            case 'Extra':
+                $this->setExtra((string) $Value);
+                break;
+
             default:
                 throw new Exception(sprintf($this->Translate('Unknown action: %s'), $Ident));
         }
@@ -158,13 +166,31 @@ class QuickSwitch extends IPSModule
                 return self::STATUS_INVALID_ENTRY;
             }
         }
+        $extras = $this->readExtras();
+        if ($extras === null) {
+            return self::STATUS_INVALID_EXTRA;
+        }
+        $switchIds = array_column($entries, 'variableId');
+        foreach ($extras as $extra) {
+            if (!in_array($extra['switchVariableId'], $switchIds, true) || $this->extraControl($extra['variableId']) === null) {
+                $this->SendDebug('Extras', 'Ungültige Zusatzvariable ' . $extra['variableId'] . ' für Schalter ' . $extra['switchVariableId'], 0);
+                return self::STATUS_INVALID_EXTRA;
+            }
+        }
         return IS_ACTIVE;
     }
 
     // Meldet nur die Nachrichten der aktuell verknüpften Variablen und Medien an und alle übrigen ab.
-    private function registerObjectMessages(array $entries): void
+    private function registerObjectMessages(array $entries, array $extras): void
     {
         $wanted = [];
+        foreach ($extras as $extra) {
+            if ($extra['variableId'] > 0 && IPS_VariableExists($extra['variableId'])) {
+                foreach (self::VARIABLE_MESSAGES as $message) {
+                    $wanted[$extra['variableId']][$message] = true;
+                }
+            }
+        }
         foreach ($entries as $entry) {
             if ($entry['variableId'] > 0 && IPS_VariableExists($entry['variableId'])) {
                 foreach (self::VARIABLE_MESSAGES as $message) {
@@ -268,6 +294,160 @@ class QuickSwitch extends IPSModule
         $this->SendDebug('Switch', 'Variable ' . $variableId . ' auf ' . ($value ? 'an' : 'aus') . ' geschaltet', 0);
     }
 
+    // --------- Zusatzvariablen (Pfeil-Menü) ---------
+
+    /**
+     * @return array<int, array{switchVariableId: int, variableId: int, label: string}>|null null bei unlesbarer Liste
+     */
+    private function readExtras(): ?array
+    {
+        $rows = json_decode($this->ReadPropertyString('Extras'), true);
+        if (!is_array($rows)) {
+            $this->SendDebug('Extras', 'Liste der Zusatzvariablen ist kein gültiges JSON', 0);
+            return null;
+        }
+
+        $extras = [];
+        foreach (array_values($rows) as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $extras[] = [
+                'switchVariableId' => is_int($row['switchVariable'] ?? null) ? $row['switchVariable'] : 0,
+                'variableId'       => is_int($row['variable'] ?? null) ? $row['variable'] : 0,
+                'label'            => is_string($row['label'] ?? null) ? trim($row['label']) : ''
+            ];
+        }
+        return $extras;
+    }
+
+    /**
+     * Bedienelement nach Variablentyp und Darstellung: Boolean => Umschalter, Aufzählung => Buttons,
+     * Schieberegler bzw. Profil mit Wertebereich => Schieberegler. Andere Variablen werden nicht unterstützt.
+     */
+    private function extraControl(int $variableId): ?array
+    {
+        if ($variableId <= 0 || !IPS_VariableExists($variableId) || !HasAction($variableId)) {
+            return null;
+        }
+        $type = IPS_GetVariable($variableId)['VariableType'];
+        if ($type === VARIABLETYPE_BOOLEAN) {
+            return ['type' => 'toggle'];
+        }
+        if ($type !== VARIABLETYPE_INTEGER && $type !== VARIABLETYPE_FLOAT) {
+            return null;
+        }
+        $options = $this->enumerationOptions($variableId);
+        if ($options !== []) {
+            return ['type' => 'buttons', 'options' => $options];
+        }
+        $range = $this->sliderRange($variableId);
+        return $range !== null ? ['type' => 'slider'] + $range : null;
+    }
+
+    // Prüft einen Wert aus der Kachel gegen das Bedienelement und wandelt ihn in den Variablentyp; null = ungültig.
+    private function extraValue(array $control, int $variableId, mixed $value): bool|int|float|null
+    {
+        if ($control['type'] === 'toggle') {
+            return is_bool($value) ? $value : null;
+        }
+        if (!is_int($value) && !is_float($value)) {
+            return null;
+        }
+        $isInteger = IPS_GetVariable($variableId)['VariableType'] === VARIABLETYPE_INTEGER;
+        if ($control['type'] === 'buttons') {
+            foreach ($control['options'] as $option) {
+                if (abs($option['value'] - $value) < 1e-9) {
+                    return $isInteger ? (int) round($option['value']) : (float) $option['value'];
+                }
+            }
+            return null;
+        }
+        $value = max($control['min'], min($control['max'], (float) $value));
+        return $isInteger ? (int) round($value) : $value;
+    }
+
+    private function setExtra(string $payload): void
+    {
+        $data = json_decode($payload, true);
+        if (!is_array($data) || !is_int($data['variable'] ?? null) || !array_key_exists('value', $data)) {
+            $this->SendDebug('Extra', 'Ungültige Anfrage', 0);
+            return;
+        }
+        $variableId = $data['variable'];
+
+        // Nur Zusatzvariablen bedienen, die einem Schalter dieser Instanz zugeordnet sind.
+        $switchIds = array_column($this->readEntries() ?? [], 'variableId');
+        $known = false;
+        foreach ($this->readExtras() ?? [] as $extra) {
+            if ($extra['variableId'] === $variableId && in_array($extra['switchVariableId'], $switchIds, true)) {
+                $known = true;
+                break;
+            }
+        }
+        $control = $known ? $this->extraControl($variableId) : null;
+        $value = $control !== null ? $this->extraValue($control, $variableId, $data['value']) : null;
+        if ($value === null) {
+            $this->SendDebug('Extra', 'Variable ' . $variableId . ' ist nicht zugeordnet, nicht bedienbar oder der Wert ist ungültig', 0);
+            return;
+        }
+
+        try {
+            $success = RequestAction($variableId, $value);
+        } catch (Throwable $e) {
+            $this->SendDebug('Extra', 'Ausnahme bei Variable ' . $variableId . ': ' . $e->getMessage(), 0);
+            $success = false;
+        }
+        if (!$success) {
+            $this->LogMessage(sprintf($this->Translate('Setting variable %d failed.'), $variableId), KL_WARNING);
+            return;
+        }
+        $this->SendDebug('Extra', 'Variable ' . $variableId . ' auf ' . json_encode($value) . ' gesetzt', 0);
+    }
+
+    // Veränderlicher Teil einer Zusatzvariable: Verfügbarkeit, Wert und formatierter Wert.
+    private function extraState(int $variableId, ?array $control): array
+    {
+        if ($control === null) {
+            return ['id' => $variableId, 'available' => false, 'value' => null, 'text' => ''];
+        }
+        $value = GetValue($variableId);
+        try {
+            $text = trim((string) GetValueFormatted($variableId));
+        } catch (Throwable $e) {
+            $text = '';
+        }
+        // Ohne passende Darstellung liefert Symcon nur den Rohwert; dann eigener Text.
+        $raw = is_bool($value) ? ['0', '1', 'true', 'false'] : [(string) $value];
+        if ($text === '' || $text === '-' || in_array($text, $raw, true)) {
+            $text = match ($control['type']) {
+                'toggle' => $this->Translate($value ? 'On' : 'Off'),
+                'slider' => $control['prefix'] . number_format((float) $value, $control['digits'], ',', '') . $control['suffix'],
+                default  => (string) $value
+            };
+        }
+        return ['id' => $variableId, 'available' => true, 'value' => $value, 'text' => $text];
+    }
+
+    /**
+     * Zusatzvariablen je Schalter-Variable für die Vollaktualisierung.
+     *
+     * @return array<int, array<int, array>> Schalter-Variablen-ID => Liste der Zusatzvariablen
+     */
+    private function buildExtras(): array
+    {
+        $bySwitch = [];
+        foreach ($this->readExtras() ?? [] as $extra) {
+            $control = $this->extraControl($extra['variableId']);
+            $label = $extra['label'];
+            if ($label === '' && $extra['variableId'] > 0 && IPS_VariableExists($extra['variableId'])) {
+                $label = IPS_GetName($extra['variableId']);
+            }
+            $bySwitch[$extra['switchVariableId']][] = ['label' => $label, 'control' => $control] + $this->extraState($extra['variableId'], $control);
+        }
+        return $bySwitch;
+    }
+
     // --------- Kachel ---------
 
     private function defaultLabel(int $variableId): string
@@ -283,6 +463,7 @@ class QuickSwitch extends IPSModule
     private function buildFullState(): array
     {
         $tiles = [];
+        $extras = $this->buildExtras();
         foreach ($this->readEntries() ?? [] as $entry) {
             $available = $this->isSwitchable($entry['variableId']);
             $color = $entry['color'] >= 0 && $entry['color'] <= 0xFFFFFF ? sprintf('#%06X', $entry['color']) : '';
@@ -296,7 +477,8 @@ class QuickSwitch extends IPSModule
                 'imageOff'     => $this->readImageDataUrl($entry['imageOff']),
                 'includeInAll' => $entry['includeInAll'],
                 'available'    => $available,
-                'on'           => $available && GetValueBoolean($entry['variableId'])
+                'on'           => $available && GetValueBoolean($entry['variableId']),
+                'extras'       => $extras[$entry['variableId']] ?? []
             ];
         }
 
@@ -322,7 +504,11 @@ class QuickSwitch extends IPSModule
                 'on'        => $available && GetValueBoolean($entry['variableId'])
             ];
         }
-        return ['type' => 'states', 'states' => $states];
+        $extras = [];
+        foreach ($this->readExtras() ?? [] as $extra) {
+            $extras[$extra['variableId']] = $this->extraState($extra['variableId'], $this->extraControl($extra['variableId']));
+        }
+        return ['type' => 'states', 'states' => $states, 'extras' => array_values($extras)];
     }
 
     private function updateVisualization(): void

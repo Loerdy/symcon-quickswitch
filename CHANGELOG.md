@@ -13,6 +13,7 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 - Optionale Beschriftung unter der Grafik.
 - Optionaler Button **Alle an/aus**, immer an erster Stelle; pro Aktor einstellbar, ob er berücksichtigt wird.
 - Automatische Anordnung und Skalierung der Schaltflächen passend zur Kachelgröße.
+- QuickSwitch: Zusatzvariablen je Aktor mit Pfeil-Menü: Umschalter (Boolean), Buttons (Aufzählung) und Schieberegler (Schieberegler bzw. Profil mit Wertebereich), mit Live-Aktualisierung.
 - Modul **QuickLock**: Kachel mit beliebig vielen Türschlössern (getrennte Status- und Aktionsvariable, z. B. Nuki über Matter).
 - QuickLock: Anzeige des Verriegelungsstatus per Icon und Farbe, optional als Text; Befehle, Beschriftungen, Icons und Farben aus der Darstellung der Aktionsvariable.
 - QuickLock: Antippen verriegelt bzw. schließt auf; Schlösser mit Öffnen und Entriegeln erhalten einen Pfeil mit allen Befehlen; Rückfrage für Öffnen und Entriegeln pro Schloss einstellbar.

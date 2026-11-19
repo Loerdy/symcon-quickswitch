@@ -9,6 +9,7 @@
     }
 
     body {
+        position: relative;
         flex: 1;
         min-height: 0;
         overflow: hidden;
@@ -31,6 +32,7 @@
         gap: var(--gap, 8px);
         width: 100%;
         height: 100%;
+        transition: opacity 0.15s ease;
     }
 
     /* Schaltfläche = Quadrat mit Grafik, darunter die Beschriftung */
@@ -159,9 +161,179 @@
         opacity: 0.6;
         text-align: center;
     }
+
+    /* Bei geöffnetem Menü tritt das Raster zurück. */
+    .grid[data-dimmed="true"] {
+        opacity: 0.08;
+        pointer-events: none;
+    }
+
+    /* Aktor mit Zusatzvariablen: Button und Pfeil in einer gemeinsamen Zelle */
+    .cell {
+        position: relative;
+        width: var(--size, 64px);
+        min-width: 0;
+    }
+
+    .more {
+        position: absolute;
+        top: calc(var(--face-height, var(--size, 64px)) - var(--more-size, 24px) - var(--size, 64px) * 0.05);
+        right: calc(var(--size, 64px) * 0.05);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--more-size, 24px);
+        height: var(--more-size, 24px);
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--content-color, CanvasText) 12%, transparent);
+        color: inherit;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .more:hover,
+    .more:focus-visible {
+        background: color-mix(in srgb, var(--content-color, CanvasText) 22%, transparent);
+        outline: none;
+    }
+
+    .more svg {
+        width: 60%;
+        height: 60%;
+    }
+
+    /* Menü mit den Zusatzvariablen */
+    .overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5em;
+        padding: 4px;
+    }
+
+    .overlay[hidden] {
+        display: none;
+    }
+
+    .overlay-title {
+        flex: 0 0 auto;
+        max-width: 100%;
+        overflow: hidden;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .extras {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        gap: 0.9em;
+        width: 100%;
+        max-width: 480px;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 0.2em 0.4em;
+    }
+
+    .extra {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35em;
+    }
+
+    .extra[data-available="false"] {
+        opacity: 0.4;
+        pointer-events: none;
+    }
+
+    .extra-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.8em;
+    }
+
+    .extra-label,
+    .extra-value {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .extra-value {
+        flex: 0 0 auto;
+        max-width: 50%;
+        opacity: 0.7;
+    }
+
+    .extra input[type="range"] {
+        width: 100%;
+        margin: 0.2em 0;
+        accent-color: var(--accent-color, currentColor);
+    }
+
+    .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4em;
+    }
+
+    .overlay > .actions {
+        flex: 0 0 auto;
+        justify-content: center;
+    }
+
+    .action {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45em;
+        min-height: 2.2em;
+        padding: 0.3em 0.85em;
+        border: 0;
+        border-radius: 1.1em;
+        background: color-mix(in srgb, var(--action-color, var(--content-color, CanvasText)) 14%, transparent);
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .action:hover {
+        background: color-mix(in srgb, var(--action-color, var(--content-color, CanvasText)) 24%, transparent);
+    }
+
+    .action:focus-visible {
+        outline: 2px solid var(--accent-color, currentColor);
+        outline-offset: -2px;
+    }
+
+    /* Aktueller Wert einer Aufzählung bzw. eingeschalteter Umschalter */
+    .action[data-active="true"] {
+        background: color-mix(in srgb, var(--action-color, var(--accent-color, currentColor)) 34%, transparent);
+        box-shadow: inset 0 0 0 1.5px var(--action-color, var(--accent-color, currentColor));
+    }
+
+    .action .action-icon {
+        color: var(--action-color, currentColor);
+        line-height: 1;
+    }
+
+    .action.close {
+        background: none;
+        opacity: 0.75;
+    }
 </style>
 
 <main class="grid" id="grid"></main>
+<div class="overlay" id="overlay" hidden role="dialog" aria-modal="true">
+    <div class="overlay-title" id="overlay-title"></div>
+    <div class="extras" id="overlay-extras"></div>
+    <div class="actions" id="overlay-actions"></div>
+</div>
 
 <script>
     "use strict";
@@ -172,6 +344,12 @@
     // Variablen-ID => Liste der Buttons (eine Variable kann mehrfach verknüpft sein)
     let buttonsById = new Map();
     let allButton = null;
+    const overlay = document.getElementById("overlay");
+    const overlayTitle = document.getElementById("overlay-title");
+    const overlayExtras = document.getElementById("overlay-extras");
+    const overlayActions = document.getElementById("overlay-actions");
+    // Variablen-ID => Aktualisierungsfunktionen der Zeilen im geöffneten Menü
+    let extraRows = new Map();
 
     function validIcon(name) {
         return typeof name === "string" && /^[a-z0-9-]+$/.test(name) ? name : DEFAULT_ICON;
@@ -225,6 +403,7 @@
         grid.style.setProperty("--label-size", label.fontSize + "px");
         grid.style.setProperty("--label-height", label.height + "px");
         grid.style.setProperty("--label-gap", label.gap + "px");
+        grid.style.setProperty("--more-size", Math.round(Math.max(22, Math.min(36, size * 0.26))) + "px");
     }
 
     function iconElement(name) {
@@ -313,6 +492,7 @@
     function renderFull() {
         const entries = Array.isArray(state.entries) ? state.entries : [];
         const showAll = state.all && state.all.show === true && entries.length > 0;
+        closeExtras();
         grid.replaceChildren();
         buttonsById = new Map();
         allButton = null;
@@ -367,7 +547,11 @@
             const list = buttonsById.get(entry.id) || [];
             list.push({ button, entry });
             buttonsById.set(entry.id, list);
-            grid.append(button);
+            if (Array.isArray(entry.extras) && entry.extras.length > 0) {
+                grid.append(extrasCell(button, entry));
+            } else {
+                grid.append(button);
+            }
         });
         applyAllState();
     }
@@ -388,6 +572,201 @@
         applyAllState();
     }
 
+    // --------- Zusatzvariablen (Pfeil-Menü) ---------
+
+    function chevronElement() {
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 24 24");
+        svg.setAttribute("aria-hidden", "true");
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", "M6 9l6 6 6-6");
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", "currentColor");
+        path.setAttribute("stroke-width", "2.5");
+        path.setAttribute("stroke-linecap", "round");
+        path.setAttribute("stroke-linejoin", "round");
+        svg.append(path);
+        return svg;
+    }
+
+    function extrasCell(button, entry) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        const more = document.createElement("button");
+        more.type = "button";
+        more.className = "more";
+        more.title = translate("More settings");
+        more.setAttribute("aria-label", translate("More settings"));
+        more.setAttribute("aria-haspopup", "dialog");
+        more.append(chevronElement());
+        more.addEventListener("click", () => openExtras(entry));
+        cell.append(button, more);
+        return cell;
+    }
+
+    function sendExtra(extra, value) {
+        requestAction("Extra", JSON.stringify({ variable: Number(extra.id), value }));
+    }
+
+    function sameValue(a, b) {
+        return typeof a === "number" && typeof b === "number" && Math.abs(a - b) < 1e-9;
+    }
+
+    function formatSlider(control, value) {
+        const digits = Number(control.digits) || 0;
+        const number = Number(value).toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+        return String(control.prefix || "") + number + String(control.suffix || "");
+    }
+
+    function pillButton(caption, icon, color) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "action";
+        if (typeof color === "string" && /^#[0-9A-Fa-f]{6}$/.test(color)) {
+            button.style.setProperty("--action-color", color);
+        }
+        if (typeof icon === "string" && icon !== "") {
+            const span = document.createElement("span");
+            span.className = "action-icon";
+            span.append(iconElement(icon));
+            button.append(span);
+        }
+        const text = document.createElement("span");
+        text.textContent = String(caption);
+        button.append(text);
+        return button;
+    }
+
+    // Eine Zeile je Zusatzvariable: Beschriftung, aktueller Wert und Bedienelement nach Art der Variable.
+    function extraRow(extra) {
+        const row = document.createElement("div");
+        row.className = "extra";
+        const head = document.createElement("div");
+        head.className = "extra-head";
+        const label = document.createElement("span");
+        label.className = "extra-label";
+        label.textContent = String(extra.label || "");
+        const valueText = document.createElement("span");
+        valueText.className = "extra-value";
+        head.append(label, valueText);
+        row.append(head);
+
+        const control = extra.control && typeof extra.control === "object" ? extra.control : null;
+        let updateControl = () => {};
+        if (control && control.type === "toggle") {
+            const actions = document.createElement("div");
+            actions.className = "actions";
+            const toggle = pillButton(translate("On"), "", "");
+            toggle.setAttribute("role", "switch");
+            toggle.addEventListener("click", () => sendExtra(extra, extra.value !== true));
+            actions.append(toggle);
+            row.append(actions);
+            updateControl = () => {
+                toggle.dataset.active = String(extra.value === true);
+                toggle.setAttribute("aria-checked", String(extra.value === true));
+                toggle.querySelector("span").textContent = translate(extra.value === true ? "On" : "Off");
+            };
+        } else if (control && control.type === "buttons" && Array.isArray(control.options)) {
+            const actions = document.createElement("div");
+            actions.className = "actions";
+            const buttons = control.options.map((option) => {
+                const button = pillButton(option.caption, option.icon, option.color);
+                button.addEventListener("click", () => sendExtra(extra, option.value));
+                actions.append(button);
+                return { button, option };
+            });
+            row.append(actions);
+            updateControl = () => buttons.forEach(({ button, option }) => (button.dataset.active = String(sameValue(option.value, extra.value))));
+        } else if (control && control.type === "slider") {
+            const slider = document.createElement("input");
+            slider.type = "range";
+            slider.min = String(control.min);
+            slider.max = String(control.max);
+            slider.step = String(control.step);
+            slider.setAttribute("aria-label", String(extra.label || ""));
+            let dragging = false;
+            slider.addEventListener("input", () => {
+                dragging = true;
+                valueText.textContent = formatSlider(control, slider.value);
+            });
+            slider.addEventListener("change", () => {
+                dragging = false;
+                sendExtra(extra, Number(slider.value));
+            });
+            row.append(slider);
+            updateControl = () => {
+                if (!dragging && typeof extra.value === "number") {
+                    slider.value = String(extra.value);
+                }
+            };
+        }
+
+        const update = () => {
+            const available = extra.available === true && control !== null;
+            row.dataset.available = String(available);
+            valueText.textContent = available ? String(extra.text || "") : translate("Not available");
+            updateControl();
+        };
+        update();
+        extraRows.set(extra.id, (extraRows.get(extra.id) || []).concat([update]));
+        return row;
+    }
+
+    function openExtras(entry) {
+        extraRows = new Map();
+        overlayTitle.textContent = String(entry.label || "");
+        overlayExtras.replaceChildren(...entry.extras.map(extraRow));
+        const close = pillButton(translate("Close"), "", "");
+        close.classList.add("close");
+        close.addEventListener("click", closeExtras);
+        overlayActions.replaceChildren(close);
+        overlay.setAttribute("aria-label", String(entry.label || ""));
+        overlay.hidden = false;
+        grid.dataset.dimmed = "true";
+        const first = overlayExtras.querySelector("button, input") || close;
+        first.focus({ preventScroll: true });
+    }
+
+    function closeExtras() {
+        overlay.hidden = true;
+        extraRows = new Map();
+        overlayExtras.replaceChildren();
+        overlayActions.replaceChildren();
+        delete grid.dataset.dimmed;
+    }
+
+    // Werte der Zusatzvariablen übernehmen (eine Variable kann bei mehreren Aktoren stehen).
+    function applyExtras(items) {
+        const entries = Array.isArray(state.entries) ? state.entries : [];
+        items.forEach((item) => {
+            if (!item || typeof item !== "object") {
+                return;
+            }
+            entries.forEach((entry) => {
+                (Array.isArray(entry.extras) ? entry.extras : []).forEach((extra) => {
+                    if (extra.id === item.id) {
+                        extra.available = item.available === true;
+                        extra.value = item.value;
+                        extra.text = item.text;
+                    }
+                });
+            });
+            (extraRows.get(item.id) || []).forEach((update) => update());
+        });
+    }
+
+    overlay.addEventListener("click", (event) => {
+        if (event.target === overlay) {
+            closeExtras();
+        }
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !overlay.hidden) {
+            closeExtras();
+        }
+    });
+
     function handleMessage(data) {
         let message = data;
         if (typeof message === "string") {
@@ -402,6 +781,9 @@
         }
         if (message.type === "states" && Array.isArray(message.states)) {
             applyStates(message.states);
+            if (Array.isArray(message.extras)) {
+                applyExtras(message.extras);
+            }
         } else if (message.type === "full") {
             state = message;
             if (!state.all || typeof state.all !== "object") {

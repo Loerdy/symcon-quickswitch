@@ -67,9 +67,25 @@ abstract class QuickSwitchTestCase extends TestCase
         ], $overrides);
     }
 
-    protected function createQuickSwitch(array $entries, bool $showAll = false, ?string $rawEntries = null): QuickSwitch
+    // Zusatzvariable mit Aktion; $presentation wird als benutzerdefinierte Darstellung gesetzt.
+    protected function createExtra(int $type, mixed $value, ?array $presentation = null, bool $withAction = true): int
+    {
+        $id = IPS_CreateVariable($type);
+        IPS_SetName($id, 'Extra ' . $id);
+        SetValue($id, $value);
+        if ($presentation !== null) {
+            IPS_SetVariableCustomPresentation($id, $presentation);
+        }
+        if ($withAction) {
+            IPS_SetVariableCustomAction($id, $this->actionScript);
+        }
+        return $id;
+    }
+
+    protected function createQuickSwitch(array $entries, bool $showAll = false, ?string $rawEntries = null, array|string $extras = []): QuickSwitch
     {
         $id = IPS_CreateInstance(self::MODULE);
+        IPS_SetProperty($id, 'Extras', is_string($extras) ? $extras : json_encode($extras));
         IPS_SetProperty($id, 'Entries', $rawEntries ?? json_encode($entries));
         IPS_SetProperty($id, 'ShowAllButton', $showAll);
         IPS_ApplyChanges($id);

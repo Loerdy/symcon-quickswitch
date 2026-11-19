@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../libs/QuickSwitchMediaImage.php';
+require_once __DIR__ . '/../libs/QuickSwitchPresentation.php';
 
 class QuickLock extends IPSModule
 {
     use QuickSwitchMediaImage;
+    use QuickSwitchPresentation;
 
     private const MEDIA_MESSAGES = [MM_UPDATE, MM_CHANGEFILE, MM_DELETE];
     // Eigene Bilder je Verriegelungsstatus: Schlüssel in der Kachel => Spalte der Eintragsliste
@@ -251,8 +253,9 @@ class QuickLock extends IPSModule
         ];
 
         $commands = [];
-        foreach ($this->presentationOptions($actionVariableId) as $value => $option) {
-            if (!isset($defaults[$value])) {
+        foreach ($this->enumerationOptions($actionVariableId) as $option) {
+            $value = (int) $option['value'];
+            if (!isset($defaults[$value]) || isset($commands[$value])) {
                 continue;
             }
             $commands[$value] = [
@@ -269,75 +272,6 @@ class QuickLock extends IPSModule
         }
         ksort($commands);
         return $commands;
-    }
-
-    /**
-     * Liest die Auswahlwerte aus der Darstellung (Aufzählung, auch über eine Vorlage) oder dem Variablenprofil.
-     *
-     * @return array<int, array{caption: string, icon: string, color: string}>
-     */
-    private function presentationOptions(int $variableId): array
-    {
-        if (!IPS_VariableExists($variableId)) {
-            return [];
-        }
-        try {
-            $presentation = IPS_GetVariablePresentation($variableId);
-        } catch (Throwable $e) {
-            $this->SendDebug('Presentation', 'Darstellung von ' . $variableId . ' nicht lesbar: ' . $e->getMessage(), 0);
-            return [];
-        }
-
-        if (($presentation['PRESENTATION'] ?? '') === VARIABLE_PRESENTATION_LEGACY) {
-            return $this->profileOptions(is_string($presentation['PROFILE'] ?? null) ? $presentation['PROFILE'] : '');
-        }
-
-        $raw = $presentation['OPTIONS'] ?? null;
-        if ($raw === null && is_string($presentation['TEMPLATE'] ?? null) && IPS_TemplateExists($presentation['TEMPLATE'])) {
-            $values = IPS_GetTemplate($presentation['TEMPLATE'])['Values'] ?? [];
-            $raw = is_array($values) ? ($values['OPTIONS'] ?? null) : null;
-        }
-        $rows = is_string($raw) ? json_decode($raw, true) : $raw;
-        if (!is_array($rows)) {
-            return [];
-        }
-
-        $options = [];
-        foreach ($rows as $row) {
-            if (!is_array($row) || !is_numeric($row['Value'] ?? null)) {
-                continue;
-            }
-            $options[(int) $row['Value']] = [
-                'caption' => is_string($row['Caption'] ?? null) ? $row['Caption'] : '',
-                'icon'    => ($row['IconActive'] ?? false) === true && is_string($row['IconValue'] ?? null) ? $row['IconValue'] : '',
-                'color'   => $this->hexColor($row['Color'] ?? -1)
-            ];
-        }
-        return $options;
-    }
-
-    private function profileOptions(string $profileName): array
-    {
-        if ($profileName === '' || !IPS_VariableProfileExists($profileName)) {
-            return [];
-        }
-        $options = [];
-        foreach (IPS_GetVariableProfile($profileName)['Associations'] ?? [] as $association) {
-            if (!is_array($association) || !is_numeric($association['Value'] ?? null)) {
-                continue;
-            }
-            $options[(int) $association['Value']] = [
-                'caption' => is_string($association['Name'] ?? null) ? $association['Name'] : '',
-                'icon'    => is_string($association['Icon'] ?? null) ? $association['Icon'] : '',
-                'color'   => $this->hexColor($association['Color'] ?? -1)
-            ];
-        }
-        return $options;
-    }
-
-    private function hexColor(mixed $color): string
-    {
-        return is_int($color) && $color >= 0 && $color <= 0xFFFFFF ? sprintf('#%06X', $color) : '';
     }
 
     // Antippen: verriegelt => aufschließen (Entriegeln, sonst Öffnen), sonst verriegeln.
