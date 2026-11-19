@@ -278,7 +278,35 @@ class QuickLockTest extends QuickLockTestCase
         $this->assertFalse($entries[0]['confirmUnlock']);
     }
 
-    // --------- Eigene Bilder ---------
+    // --------- Eigene Icons und Bilder ---------
+
+    public function testOwnIconsReplacePresentationIcons(): void
+    {
+        $status = $this->createStatus(1);
+        $module = $this->createQuickLock([$this->entry($status, $this->createAction(self::KNOB_OPTIONS), [
+            'iconLocked'   => 'door-closed',
+            'iconUnlocked' => 'door-open'
+        ])]);
+
+        $expected = [1 => ['door-closed', '#00FF00'], 2 => ['door-open', '#FF0000'], 3 => ['door-open', '#FFFF00'], 0 => ['triangle-exclamation', '']];
+        foreach ($expected as $value => [$icon, $color]) {
+            SetValue($status, $value);
+            $tile = $this->state($module)['entries'][0];
+            // Die Farbe kommt weiterhin aus der Darstellung; entsperrt ohne eigenes Icon nutzt das für entriegelt.
+            $this->assertSame([$icon, $color], [$tile['icon'], $tile['color']], 'Status ' . $value);
+        }
+    }
+
+    public function testOwnUnlatchedIconAndInvalidIconNames(): void
+    {
+        $status = $this->createStatus(3);
+        $module = $this->createQuickLock([
+            $this->entry($status, $this->createAction(self::KNOB_OPTIONS), ['iconUnlatched' => 'person-walking', 'iconUnlocked' => 'door-open']),
+            $this->entry($status, $this->createAction(self::KNOB_OPTIONS), ['iconUnlatched' => '<b>x</b>', 'iconUnlocked' => 42])
+        ]);
+
+        $this->assertSame(['person-walking', 'unlock'], array_column($this->state($module)['entries'], 'icon'));
+    }
 
     public function testImagesAreSentAsDataUrls(): void
     {

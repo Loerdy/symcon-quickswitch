@@ -53,6 +53,33 @@
                     }
                 },
                 {
+                    "caption": "Icon locked",
+                    "name": "iconLocked",
+                    "width": "160px",
+                    "add": "",
+                    "edit": {
+                        "type": "SelectIcon"
+                    }
+                },
+                {
+                    "caption": "Icon unlocked",
+                    "name": "iconUnlocked",
+                    "width": "160px",
+                    "add": "",
+                    "edit": {
+                        "type": "SelectIcon"
+                    }
+                },
+                {
+                    "caption": "Icon unlatched",
+                    "name": "iconUnlatched",
+                    "width": "160px",
+                    "add": "",
+                    "edit": {
+                        "type": "SelectIcon"
+                    }
+                },
+                {
                     "caption": "Image locked (optional)",
                     "name": "imageLocked",
                     "width": "200px",
@@ -109,7 +136,7 @@
         },
         {
             "type": "Label",
-            "caption": "Own images replace the icon for the respective state; without an image for unlatched, the image for unlocked is used. Not fully locked always shows the warning icon. Images must be JPEG or PNG media objects of at most 512 KB."
+            "caption": "Per state, an own image is shown, otherwise the own icon, otherwise the icon from the presentation (empty icon = from the presentation). Without an image or icon for unlatched, the one for unlocked is used. Not fully locked always shows the warning icon. Images must be JPEG or PNG media objects of at most 512 KB."
         },
         {
             "type": "Label",

@@ -11,6 +11,8 @@ class QuickLock extends IPSModule
     private const MEDIA_MESSAGES = [MM_UPDATE, MM_CHANGEFILE, MM_DELETE];
     // Eigene Bilder je Verriegelungsstatus: Schlüssel in der Kachel => Spalte der Eintragsliste
     private const IMAGE_COLUMNS = ['locked' => 'imageLocked', 'unlocked' => 'imageUnlocked', 'unlatched' => 'imageUnlatched'];
+    // Eigene Icons je Verriegelungsstatus; leer = Icon aus der Darstellung der Aktionsvariable
+    private const ICON_COLUMNS = ['locked' => 'iconLocked', 'unlocked' => 'iconUnlocked', 'unlatched' => 'iconUnlatched'];
 
     // Werte der Aktionsvariable (Matter DoorLock_LockUnlockUnbolt)
     private const COMMAND_OPEN = 0;
@@ -115,7 +117,7 @@ class QuickLock extends IPSModule
     // --------- Einträge ---------
 
     /**
-     * @return array<int, array{statusVariableId: int, actionVariableId: int, label: string, showLabel: bool, confirmOpen: bool, confirmUnlock: bool, images: array<string, int>}>|null null bei unlesbarer Liste
+     * @return array<int, array{statusVariableId: int, actionVariableId: int, label: string, showLabel: bool, confirmOpen: bool, confirmUnlock: bool, images: array<string, int>, icons: array<string, string>}>|null null bei unlesbarer Liste
      */
     private function readEntries(): ?array
     {
@@ -134,8 +136,14 @@ class QuickLock extends IPSModule
             foreach (self::IMAGE_COLUMNS as $key => $column) {
                 $images[$key] = is_int($row[$column] ?? null) ? $row[$column] : 0;
             }
+            $icons = [];
+            foreach (self::ICON_COLUMNS as $key => $column) {
+                $icon = is_string($row[$column] ?? null) ? trim($row[$column]) : '';
+                $icons[$key] = preg_match('/^[a-z0-9-]+$/', $icon) === 1 ? $icon : '';
+            }
             $entries[] = [
                 'images'           => $images,
+                'icons'            => $icons,
                 'statusVariableId' => is_int($row['statusVariable'] ?? null) ? $row['statusVariable'] : 0,
                 'actionVariableId' => is_int($row['actionVariable'] ?? null) ? $row['actionVariable'] : 0,
                 'label'            => is_string($row['label'] ?? null) ? trim($row['label']) : '',
@@ -412,17 +420,21 @@ class QuickLock extends IPSModule
     }
 
     /**
-     * Grafik zum Verriegelungsstatus: Icon und Farbe des passenden Befehls aus der Darstellung der Aktionsvariable.
+     * Grafik zum Verriegelungsstatus: eigenes Icon, sonst Icon des passenden Befehls aus der Darstellung der
+     * Aktionsvariable; die Farbe stammt immer aus der Darstellung. Entsperrt ohne eigenes Icon nutzt das eigene Icon
+     * für entriegelt (wie bei den Bildern).
      *
+     * @param array<string, string> $icons eigene Icons je Zustand
      * @return array{state: string, icon: string, color: string}
      */
-    private function statusGraphic(int $status, array $commands): array
+    private function statusGraphic(int $status, array $commands, array $icons): array
     {
         $unlockCommand = $commands[self::COMMAND_UNLOCK] ?? $commands[self::COMMAND_OPEN];
+        $openCommand = $commands[self::COMMAND_OPEN] ?? $unlockCommand;
         return match ($status) {
-            self::STATE_LOCKED           => ['state' => 'locked', 'icon' => $commands[self::COMMAND_LOCK]['icon'], 'color' => $commands[self::COMMAND_LOCK]['color']],
-            self::STATE_UNLOCKED         => ['state' => 'unlocked', 'icon' => $unlockCommand['icon'], 'color' => $unlockCommand['color']],
-            self::STATE_UNLATCHED        => ['state' => 'unlatched', 'icon' => ($commands[self::COMMAND_OPEN] ?? $unlockCommand)['icon'], 'color' => ($commands[self::COMMAND_OPEN] ?? $unlockCommand)['color']],
+            self::STATE_LOCKED           => ['state' => 'locked', 'icon' => $this->ownIcon($icons, 'locked') ?: $commands[self::COMMAND_LOCK]['icon'], 'color' => $commands[self::COMMAND_LOCK]['color']],
+            self::STATE_UNLOCKED         => ['state' => 'unlocked', 'icon' => $this->ownIcon($icons, 'unlocked') ?: $unlockCommand['icon'], 'color' => $unlockCommand['color']],
+            self::STATE_UNLATCHED        => ['state' => 'unlatched', 'icon' => $this->ownIcon($icons, 'unlatched', 'unlocked') ?: $openCommand['icon'], 'color' => $openCommand['color']],
             self::STATE_NOT_FULLY_LOCKED => ['state' => 'notLocked', 'icon' => 'triangle-exclamation', 'color' => ''],
             default                      => ['state' => 'unknown', 'icon' => 'question', 'color' => '']
         };
@@ -444,10 +456,21 @@ class QuickLock extends IPSModule
             return $state;
         }
         $status = GetValueInteger($entry['statusVariableId']);
-        return array_merge($state, $this->statusGraphic($status, $commands), [
+        return array_merge($state, $this->statusGraphic($status, $commands, $entry['icons']), [
             'status' => $status,
             'text'   => $this->statusText($entry['statusVariableId'], $status)
         ]);
+    }
+
+    // Erstes gesetztes eigenes Icon der genannten Zustände
+    private function ownIcon(array $icons, string ...$keys): string
+    {
+        foreach ($keys as $key) {
+            if (($icons[$key] ?? '') !== '') {
+                return $icons[$key];
+            }
+        }
+        return '';
     }
 
     private function buildFullState(): array

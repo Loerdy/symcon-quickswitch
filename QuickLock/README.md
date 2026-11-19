@@ -24,7 +24,7 @@ Kachel für die Kachel-Visualisierung von IP-Symcon, die den Zustand von Türsch
   | Entsperrt (Falle gezogen) | Icon und Farbe des Befehls „Öffnen“, Fläche farbig hinterlegt |
   | Nicht vollständig verriegelt | Warnsymbol in Rot |
 
-- **Eigene Bilder** (Medienobjekte) für verriegelt, entriegelt und entsperrt; sie ersetzen das Icon im jeweiligen Zustand. Ohne Bild für entsperrt wird das Bild für entriegelt verwendet, ohne Bild das Icon.
+- **Eigene Icons und Bilder** (Medienobjekte) für verriegelt, entriegelt und entsperrt. Je Zustand gilt: eigenes Bild, sonst eigenes Icon, sonst Icon aus der Darstellung. Ohne eigenes Bild bzw. Icon für entsperrt wird das für entriegelt verwendet. Die Iconfarbe stammt immer aus der Darstellung.
 - **Antippen:** Ist das Schloss verriegelt, wird es aufgeschlossen (Entriegeln, bei Schlössern ohne diesen Befehl Öffnen); sonst wird es verriegelt.
 - **Pfeil:** Schlösser, die Öffnen und Entriegeln getrennt anbieten (z. B. Tür mit Knauf), erhalten einen kleinen Pfeil. Er öffnet ein Menü mit allen Befehlen.
 - **Rückfrage:** Pro Schloss einstellbar, ob Öffnen bzw. Entriegeln erst nach einer Bestätigung ausgeführt wird.
@@ -58,6 +58,9 @@ __Konfigurationsseite__:
 | ↳ Aktionsvariable | Integer-Variable mit Aktion, bei Matter `DoorLock_LockUnlockUnbolt` („Türschloss“) |
 | ↳ Beschriftung | Text unter dem Button; leer = Name des Geräts (übergeordnete Instanz der Aktionsvariable) |
 | ↳ Beschriftung anzeigen | Blendet die Beschriftung ein oder aus (als Tooltip bleibt sie erhalten) |
+| ↳ Icon verriegelt | Eigenes Icon im Zustand verriegelt; leer = Icon aus der Darstellung |
+| ↳ Icon entriegelt | Eigenes Icon im Zustand entriegelt; leer = Icon aus der Darstellung |
+| ↳ Icon entsperrt | Eigenes Icon im Zustand entsperrt; leer = eigenes Icon für entriegelt bzw. Icon aus der Darstellung |
 | ↳ Bild verriegelt | Optionales Medienobjekt (JPEG/PNG, max. 512 KB); ersetzt das Icon im Zustand verriegelt |
 | ↳ Bild entriegelt | Optionales Medienobjekt für den Zustand entriegelt |
 | ↳ Bild entsperrt | Optionales Medienobjekt für den Zustand entsperrt; ohne Bild wird das Bild für entriegelt verwendet |
@@ -86,7 +89,7 @@ Ist ein Eintrag ungültig (Variable gelöscht, kein Integer oder Aktionsvariable
 
 Das Modul legt keine Statusvariablen und keine Profile an. Die Statusvariable und die eigenen Bilder werden nur gelesen; bedient wird ausschließlich über die Aktion der Aktionsvariable.
 
-Bei *Nicht vollständig verriegelt* erscheint immer das rote Warnsymbol, auch wenn eigene Bilder hinterlegt sind.
+Bei *Nicht vollständig verriegelt* erscheint immer das rote Warnsymbol, auch wenn eigene Icons oder Bilder hinterlegt sind.
 
 ### 6. Visualisierung
 
