@@ -2,8 +2,16 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../libs/QuickSwitchMediaImage.php';
+
 class QuickLock extends IPSModule
 {
+    use QuickSwitchMediaImage;
+
+    private const MEDIA_MESSAGES = [MM_UPDATE, MM_CHANGEFILE, MM_DELETE];
+    // Eigene Bilder je Verriegelungsstatus: Schlüssel in der Kachel => Spalte der Eintragsliste
+    private const IMAGE_COLUMNS = ['locked' => 'imageLocked', 'unlocked' => 'imageUnlocked', 'unlatched' => 'imageUnlatched'];
+
     // Werte der Aktionsvariable (Matter DoorLock_LockUnlockUnbolt)
     private const COMMAND_OPEN = 0;
     private const COMMAND_UNLOCK = 1;
@@ -40,7 +48,7 @@ class QuickLock extends IPSModule
         }
 
         $entries = $this->readEntries();
-        $this->registerVariableMessages($entries ?? []);
+        $this->registerObjectMessages($entries ?? []);
         $this->SetStatus($this->configurationStatus($entries));
         $this->updateVisualization();
     }
@@ -53,12 +61,19 @@ class QuickLock extends IPSModule
                 break;
 
             case VM_UPDATE:
-                $this->updateVisualization();
+                // Nur Zustände übertragen; Bilder bleiben in der Kachel unverändert.
+                $this->updateStates();
                 break;
 
             case VM_DELETE:
                 $this->SetStatus($this->configurationStatus($this->readEntries()));
                 $this->updateVisualization();
+                break;
+
+            default:
+                if (in_array($Message, self::MEDIA_MESSAGES, true)) {
+                    $this->updateVisualization();
+                }
                 break;
         }
     }
@@ -73,7 +88,7 @@ class QuickLock extends IPSModule
 
         try {
             $initialState = json_encode(
-                $this->buildState(),
+                $this->buildFullState(),
                 JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR
             );
         } catch (Throwable $e) {
@@ -100,7 +115,7 @@ class QuickLock extends IPSModule
     // --------- Einträge ---------
 
     /**
-     * @return array<int, array{statusVariableId: int, actionVariableId: int, label: string, showLabel: bool, confirmOpen: bool, confirmUnlock: bool}>|null null bei unlesbarer Liste
+     * @return array<int, array{statusVariableId: int, actionVariableId: int, label: string, showLabel: bool, confirmOpen: bool, confirmUnlock: bool, images: array<string, int>}>|null null bei unlesbarer Liste
      */
     private function readEntries(): ?array
     {
@@ -115,7 +130,12 @@ class QuickLock extends IPSModule
             if (!is_array($row)) {
                 continue;
             }
+            $images = [];
+            foreach (self::IMAGE_COLUMNS as $key => $column) {
+                $images[$key] = is_int($row[$column] ?? null) ? $row[$column] : 0;
+            }
             $entries[] = [
+                'images'           => $images,
                 'statusVariableId' => is_int($row['statusVariable'] ?? null) ? $row['statusVariable'] : 0,
                 'actionVariableId' => is_int($row['actionVariable'] ?? null) ? $row['actionVariable'] : 0,
                 'label'            => is_string($row['label'] ?? null) ? trim($row['label']) : '',
@@ -158,8 +178,8 @@ class QuickLock extends IPSModule
         return IS_ACTIVE;
     }
 
-    // Meldet nur die Nachrichten der aktuell verknüpften Variablen an und alle übrigen ab.
-    private function registerVariableMessages(array $entries): void
+    // Meldet nur die Nachrichten der aktuell verknüpften Variablen und Medien an und alle übrigen ab.
+    private function registerObjectMessages(array $entries): void
     {
         $wanted = [];
         foreach ($entries as $entry) {
@@ -169,6 +189,13 @@ class QuickLock extends IPSModule
             }
             if ($entry['actionVariableId'] > 0 && IPS_VariableExists($entry['actionVariableId'])) {
                 $wanted[$entry['actionVariableId']][VM_DELETE] = true;
+            }
+            foreach ($entry['images'] as $mediaId) {
+                if ($mediaId > 0 && IPS_MediaExists($mediaId)) {
+                    foreach (self::MEDIA_MESSAGES as $message) {
+                        $wanted[$mediaId][$message] = true;
+                    }
+                }
             }
         }
 
@@ -401,37 +428,48 @@ class QuickLock extends IPSModule
         };
     }
 
-    private function buildState(): array
+    // Veränderlicher Teil eines Schlosses: Verfügbarkeit, Status und passende Grafik.
+    private function entryState(array $entry, array $commands): array
+    {
+        $state = [
+            'id'        => $entry['actionVariableId'],
+            'available' => $this->isValidEntry($entry),
+            'status'    => null,
+            'state'     => 'unknown',
+            'text'      => '',
+            'icon'      => 'lock',
+            'color'     => ''
+        ];
+        if (!$state['available']) {
+            return $state;
+        }
+        $status = GetValueInteger($entry['statusVariableId']);
+        return array_merge($state, $this->statusGraphic($status, $commands), [
+            'status' => $status,
+            'text'   => $this->statusText($entry['statusVariableId'], $status)
+        ]);
+    }
+
+    private function buildFullState(): array
     {
         $tiles = [];
         foreach ($this->readEntries() ?? [] as $entry) {
-            $available = $this->isValidEntry($entry);
             $commands = $this->commandOptions($entry['actionVariableId']);
             $tile = [
-                'id'            => $entry['actionVariableId'],
                 'label'         => $entry['label'] !== '' ? $entry['label'] : $this->defaultLabel($entry['actionVariableId']),
                 'showLabel'     => $entry['showLabel'],
                 'confirmOpen'   => $entry['confirmOpen'],
                 'confirmUnlock' => $entry['confirmUnlock'],
                 'commands'      => [],
-                'available'     => $available,
-                'status'        => null,
-                'state'         => 'unknown',
-                'text'          => '',
-                'icon'          => 'lock',
-                'color'         => ''
+                'images'        => []
             ];
             foreach ($commands as $value => $command) {
                 $tile['commands'][] = ['value' => $value] + $command;
             }
-            if ($available) {
-                $status = GetValueInteger($entry['statusVariableId']);
-                $tile = array_merge($tile, $this->statusGraphic($status, $commands), [
-                    'status' => $status,
-                    'text'   => $this->statusText($entry['statusVariableId'], $status)
-                ]);
+            foreach ($entry['images'] as $key => $mediaId) {
+                $tile['images'][$key] = $this->readImageDataUrl($mediaId);
             }
-            $tiles[] = $tile;
+            $tiles[] = $this->entryState($entry, $commands) + $tile;
         }
 
         return [
@@ -441,9 +479,23 @@ class QuickLock extends IPSModule
         ];
     }
 
+    private function buildStates(): array
+    {
+        $states = [];
+        foreach ($this->readEntries() ?? [] as $entry) {
+            $states[] = $this->entryState($entry, $this->commandOptions($entry['actionVariableId']));
+        }
+        return ['type' => 'states', 'states' => $states];
+    }
+
     private function updateVisualization(): void
     {
-        $this->sendToTile($this->buildState());
+        $this->sendToTile($this->buildFullState());
+    }
+
+    private function updateStates(): void
+    {
+        $this->sendToTile($this->buildStates());
     }
 
     private function sendToTile(array $message): void

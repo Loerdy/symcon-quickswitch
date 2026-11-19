@@ -278,6 +278,61 @@ class QuickLockTest extends QuickLockTestCase
         $this->assertFalse($entries[0]['confirmUnlock']);
     }
 
+    // --------- Eigene Bilder ---------
+
+    public function testImagesAreSentAsDataUrls(): void
+    {
+        $locked = $this->createImage(self::PNG);
+        $unlocked = $this->createImage(self::JPEG);
+        $module = $this->createQuickLock([
+            $this->entry($this->createStatus(1), $this->createAction(self::KNOB_OPTIONS), ['imageLocked' => $locked, 'imageUnlocked' => $unlocked]),
+            $this->entry($this->createStatus(1), $this->createAction(self::HANDLE_OPTIONS))
+        ]);
+
+        [$withImages, $withoutImages] = $this->state($module)['entries'];
+
+        $this->assertSame([
+            'locked'    => 'data:image/png;base64,' . base64_encode(self::PNG),
+            'unlocked'  => 'data:image/jpeg;base64,' . base64_encode(self::JPEG),
+            'unlatched' => ''
+        ], $withImages['images']);
+        $this->assertSame(['locked' => '', 'unlocked' => '', 'unlatched' => ''], $withoutImages['images']);
+    }
+
+    public function testInvalidImagesAreIgnored(): void
+    {
+        $module = $this->createQuickLock([$this->entry($this->createStatus(1), $this->createAction(self::KNOB_OPTIONS), [
+            'imageLocked'    => $this->createImage('no image'),
+            'imageUnlocked'  => $this->createImage(self::PNG . str_repeat('x', 524288)),
+            'imageUnlatched' => 99999
+        ])]);
+
+        $this->assertSame(['locked' => '', 'unlocked' => '', 'unlatched' => ''], $this->state($module)['entries'][0]['images']);
+    }
+
+    public function testStateUpdatesDoNotContainImages(): void
+    {
+        $status = $this->createStatus(1);
+        $action = $this->createAction(self::KNOB_OPTIONS);
+        $module = $this->createQuickLock([$this->entry($status, $action, ['imageLocked' => $this->createImage(self::PNG)])]);
+
+        SetValue($status, 2);
+        $states = $this->call($module, 'buildStates');
+
+        $this->assertSame('states', $states['type']);
+        $this->assertSame([
+            ['id' => $action, 'available' => true, 'status' => 2, 'state' => 'unlocked', 'text' => 'Unlocked', 'icon' => 'unlock', 'color' => '#FF0000']
+        ], $states['states']);
+    }
+
+    public function testMediaMessagesFollowTheConfiguredImages(): void
+    {
+        $image = $this->createImage(self::PNG);
+        $module = $this->createQuickLock([$this->entry($this->createStatus(1), $this->createAction(self::KNOB_OPTIONS), ['imageUnlatched' => $image])]);
+
+        $this->assertEqualsCanonicalizing([MM_UPDATE, MM_CHANGEFILE, MM_DELETE], $this->call($module, 'GetMessageList')[$image]);
+    }
+
     public function testTileContainsEscapedInitialState(): void
     {
         $module = $this->createQuickLock([$this->entry($this->createStatus(1), $this->createAction(self::KNOB_OPTIONS), ['label' => '<b>Tür</b> & "Co"'])]);

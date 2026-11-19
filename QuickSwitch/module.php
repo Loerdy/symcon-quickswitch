@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/../libs/QuickSwitchMediaImage.php';
+
 class QuickSwitch extends IPSModule
 {
-    // Bilder werden als Data-URL an die Kachel übertragen; größere Bilder würden jede Vollaktualisierung ausbremsen.
-    private const IMAGE_MAX_BYTES = 524288;
+    use QuickSwitchMediaImage;
+
     private const VARIABLE_MESSAGES = [VM_UPDATE, VM_DELETE];
     private const MEDIA_MESSAGES = [MM_UPDATE, MM_CHANGEFILE, MM_DELETE];
     private const DEFAULT_ICON = 'power-off';
@@ -264,36 +266,6 @@ class QuickSwitch extends IPSModule
             return;
         }
         $this->SendDebug('Switch', 'Variable ' . $variableId . ' auf ' . ($value ? 'an' : 'aus') . ' geschaltet', 0);
-    }
-
-    // --------- Bilder ---------
-
-    private function readImageDataUrl(int $mediaId): string
-    {
-        if ($mediaId <= 0) {
-            return '';
-        }
-        if (!IPS_MediaExists($mediaId)) {
-            $this->SendDebug('Images', 'Medium ' . $mediaId . ' existiert nicht', 0);
-            return '';
-        }
-        $media = IPS_GetMedia($mediaId);
-        if (($media['MediaType'] ?? -1) !== MEDIATYPE_IMAGE || (int) ($media['MediaSize'] ?? 0) > self::IMAGE_MAX_BYTES) {
-            $this->SendDebug('Images', 'Medium ' . $mediaId . ' ist kein Bild oder größer als 512 KB', 0);
-            return '';
-        }
-        $content = IPS_GetMediaContent($mediaId);
-        $signature = $content !== '' ? base64_decode(substr($content, 0, 16), true) : false;
-        if (is_string($signature)) {
-            if (substr($signature, 0, 3) === "\xFF\xD8\xFF") {
-                return 'data:image/jpeg;base64,' . $content;
-            }
-            if (substr($signature, 0, 8) === "\x89PNG\r\n\x1A\n") {
-                return 'data:image/png;base64,' . $content;
-            }
-        }
-        $this->SendDebug('Images', 'Medium ' . $mediaId . ' ist kein JPEG oder PNG', 0);
-        return '';
     }
 
     // --------- Kachel ---------

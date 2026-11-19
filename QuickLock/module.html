@@ -158,6 +158,17 @@
         opacity: 0.45;
     }
 
+    .graphic img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: calc(var(--size, 64px) * 0.06);
+    }
+
+    .cell[data-state="unknown"] .graphic img {
+        filter: grayscale(1);
+    }
+
     /* Befehl gesendet, Rückmeldung des Schlosses steht noch aus */
     .cell[data-pending="true"] .graphic {
         animation: pending 1.1s ease-in-out infinite;
@@ -331,7 +342,6 @@
     const PENDING_TIMEOUT = 30000;
 
     let state = { type: "full", showStatus: false, entries: [] };
-    let structureKey = "";
     // Variablen-ID => Liste der Zellen (ein Schloss kann mehrfach verknüpft sein)
     let cellsById = new Map();
     // Variablen-ID => { status, timer } eines gesendeten Befehls
@@ -340,6 +350,17 @@
 
     function validIcon(name, fallback) {
         return typeof name === "string" && /^[a-z0-9-]+$/.test(name) ? name : fallback;
+    }
+
+    function isImage(value) {
+        return typeof value === "string" && value.startsWith("data:image/");
+    }
+
+    // Eigenes Bild zum Zustand; entsperrt ohne eigenes Bild zeigt das Bild für entriegelt.
+    function imageFor(entry, stateName) {
+        const images = entry.images && typeof entry.images === "object" ? entry.images : {};
+        const candidates = { locked: [images.locked], unlocked: [images.unlocked], unlatched: [images.unlatched, images.unlocked] };
+        return (candidates[stateName] || []).find(isImage) || "";
     }
 
     function validColor(value) {
@@ -576,7 +597,7 @@
 
     // --------- Darstellung ---------
 
-    // Zustand eines Schlosses anzeigen; Icon nur bei Änderung austauschen (icons.js ersetzt das <i> durch ein SVG).
+    // Zustand eines Schlosses anzeigen; Bild bzw. Icon nur bei Änderung austauschen (icons.js ersetzt das <i> durch ein SVG).
     function applyEntryState(item) {
         const { cell, button, more, graphic, statusLabel, entry } = item;
         const available = entry.available === true;
@@ -592,10 +613,26 @@
         } else {
             cell.style.removeProperty("--own-color");
         }
-        const icon = validIcon(entry.icon, "lock");
-        if (graphic.dataset.icon !== icon) {
-            graphic.dataset.icon = icon;
-            graphic.replaceChildren(iconElement(icon, "lock"));
+        const image = available ? imageFor(entry, stateName) : "";
+        if (image !== "") {
+            const current = graphic.querySelector("img");
+            if (current) {
+                if (current.getAttribute("src") !== image) {
+                    current.src = image;
+                }
+            } else {
+                const element = document.createElement("img");
+                element.alt = "";
+                element.src = image;
+                graphic.replaceChildren(element);
+            }
+            delete graphic.dataset.icon;
+        } else {
+            const icon = validIcon(entry.icon, "lock");
+            if (graphic.dataset.icon !== icon) {
+                graphic.dataset.icon = icon;
+                graphic.replaceChildren(iconElement(icon, "lock"));
+            }
         }
         const text = available ? String(entry.text || "") : translate("Not available");
         if (statusLabel) {
@@ -680,37 +717,33 @@
         });
     }
 
-    // Nur die Zustände übernehmen, wenn sich Aufbau und Beschriftungen nicht geändert haben (Menü bleibt offen).
-    function applyStates(entries) {
+    // Nur Zustände übernehmen, ohne Bilder erneut zu übertragen oder das Raster neu aufzubauen (Menü bleibt offen).
+    function applyStates(states) {
         const seen = new Map();
-        entries.forEach((entry) => {
-            const index = seen.get(entry.id) || 0;
-            seen.set(entry.id, index + 1);
-            const item = (cellsById.get(entry.id) || [])[index];
-            if (!item) {
+        states.forEach((item) => {
+            if (!item || typeof item !== "object") {
                 return;
             }
-            item.entry = entry;
+            const index = seen.get(item.id) || 0;
+            seen.set(item.id, index + 1);
+            const cellItem = (cellsById.get(item.id) || [])[index];
+            if (!cellItem) {
+                return;
+            }
+            const entry = cellItem.entry;
+            ["available", "status", "state", "text", "icon", "color"].forEach((key) => (entry[key] = item[key]));
             const pending = pendingById.get(entry.id);
             if (pending && (entry.status !== pending.status || entry.available !== true)) {
                 clearPending(entry.id);
             }
-            applyEntryState(item);
+            applyEntryState(cellItem);
         });
         if (overlayEntryId !== null) {
-            const current = entries.find((entry) => entry.id === overlayEntryId);
-            if (!current || current.available !== true) {
+            const current = (cellsById.get(overlayEntryId) || [])[0];
+            if (!current || current.entry.available !== true) {
                 closeOverlay();
             }
         }
-    }
-
-    function computeStructureKey(message) {
-        const entries = Array.isArray(message.entries) ? message.entries : [];
-        return JSON.stringify([
-            message.showStatus === true,
-            entries.map((entry) => [entry.id, entry.label, entry.showLabel, entry.confirmOpen, entry.confirmUnlock, entry.commands])
-        ]);
     }
 
     function handleMessage(data) {
@@ -727,18 +760,14 @@
         }
         if (message.type === "failed") {
             showFailed(message.id);
+        } else if (message.type === "states" && Array.isArray(message.states)) {
+            applyStates(message.states);
         } else if (message.type === "full") {
             if (!Array.isArray(message.entries)) {
                 message.entries = [];
             }
-            const key = computeStructureKey(message);
             state = message;
-            if (key === structureKey) {
-                applyStates(message.entries);
-            } else {
-                structureKey = key;
-                renderFull();
-            }
+            renderFull();
         }
     }
 

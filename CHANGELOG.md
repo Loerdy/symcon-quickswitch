@@ -17,3 +17,4 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 - QuickLock: Anzeige des Verriegelungsstatus per Icon und Farbe, optional als Text; Befehle, Beschriftungen, Icons und Farben aus der Darstellung der Aktionsvariable.
 - QuickLock: Antippen verriegelt bzw. schließt auf; Schlösser mit Öffnen und Entriegeln erhalten einen Pfeil mit allen Befehlen; Rückfrage für Öffnen und Entriegeln pro Schloss einstellbar.
 - QuickLock: Anzeige für laufende Befehle bis zur Rückmeldung des Schlosses sowie Hinweis bei fehlgeschlagenen Befehlen.
+- QuickLock: Eigene Bilder (Medienobjekte) für verriegelt, entriegelt und entsperrt; Bilder werden nur bei Konfigurations- oder Medienänderungen übertragen, nicht bei jeder Statusänderung.

@@ -53,6 +53,33 @@
                     }
                 },
                 {
+                    "caption": "Image locked (optional)",
+                    "name": "imageLocked",
+                    "width": "200px",
+                    "add": 0,
+                    "edit": {
+                        "type": "SelectMedia"
+                    }
+                },
+                {
+                    "caption": "Image unlocked (optional)",
+                    "name": "imageUnlocked",
+                    "width": "200px",
+                    "add": 0,
+                    "edit": {
+                        "type": "SelectMedia"
+                    }
+                },
+                {
+                    "caption": "Image unlatched (optional)",
+                    "name": "imageUnlatched",
+                    "width": "200px",
+                    "add": 0,
+                    "edit": {
+                        "type": "SelectMedia"
+                    }
+                },
+                {
                     "caption": "Confirm open",
                     "name": "confirmOpen",
                     "width": "140px",
@@ -79,6 +106,10 @@
         {
             "type": "Label",
             "caption": "Which commands a lock offers is read from the presentation of the action variable. If it contains the value 1 (unlock), the button gets an arrow with all commands. Captions, icons and colors are taken from the presentation as well."
+        },
+        {
+            "type": "Label",
+            "caption": "Own images replace the icon for the respective state; without an image for unlatched, the image for unlocked is used. Not fully locked always shows the warning icon. Images must be JPEG or PNG media objects of at most 512 KB."
         },
         {
             "type": "Label",

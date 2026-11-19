@@ -24,6 +24,7 @@ Kachel für die Kachel-Visualisierung von IP-Symcon, die den Zustand von Türsch
   | Entsperrt (Falle gezogen) | Icon und Farbe des Befehls „Öffnen“, Fläche farbig hinterlegt |
   | Nicht vollständig verriegelt | Warnsymbol in Rot |
 
+- **Eigene Bilder** (Medienobjekte) für verriegelt, entriegelt und entsperrt; sie ersetzen das Icon im jeweiligen Zustand. Ohne Bild für entsperrt wird das Bild für entriegelt verwendet, ohne Bild das Icon.
 - **Antippen:** Ist das Schloss verriegelt, wird es aufgeschlossen (Entriegeln, bei Schlössern ohne diesen Befehl Öffnen); sonst wird es verriegelt.
 - **Pfeil:** Schlösser, die Öffnen und Entriegeln getrennt anbieten (z. B. Tür mit Knauf), erhalten einen kleinen Pfeil. Er öffnet ein Menü mit allen Befehlen.
 - **Rückfrage:** Pro Schloss einstellbar, ob Öffnen bzw. Entriegeln erst nach einer Bestätigung ausgeführt wird.
@@ -57,6 +58,9 @@ __Konfigurationsseite__:
 | ↳ Aktionsvariable | Integer-Variable mit Aktion, bei Matter `DoorLock_LockUnlockUnbolt` („Türschloss“) |
 | ↳ Beschriftung | Text unter dem Button; leer = Name des Geräts (übergeordnete Instanz der Aktionsvariable) |
 | ↳ Beschriftung anzeigen | Blendet die Beschriftung ein oder aus (als Tooltip bleibt sie erhalten) |
+| ↳ Bild verriegelt | Optionales Medienobjekt (JPEG/PNG, max. 512 KB); ersetzt das Icon im Zustand verriegelt |
+| ↳ Bild entriegelt | Optionales Medienobjekt für den Zustand entriegelt |
+| ↳ Bild entsperrt | Optionales Medienobjekt für den Zustand entsperrt; ohne Bild wird das Bild für entriegelt verwendet |
 | ↳ Öffnen bestätigen | Öffnen erst nach Rückfrage ausführen (Standard: an) |
 | ↳ Entriegeln bestätigen | Entriegeln erst nach Rückfrage ausführen (Standard: aus) |
 | Verriegelungsstatus als Text | Zeigt den Status als zweite Zeile unter dem Button |
@@ -80,7 +84,9 @@ Ist ein Eintrag ungültig (Variable gelöscht, kein Integer oder Aktionsvariable
 
 ### 5. Statusvariablen und Profile
 
-Das Modul legt keine Statusvariablen und keine Profile an. Die Statusvariable wird nur gelesen; bedient wird ausschließlich über die Aktion der Aktionsvariable.
+Das Modul legt keine Statusvariablen und keine Profile an. Die Statusvariable und die eigenen Bilder werden nur gelesen; bedient wird ausschließlich über die Aktion der Aktionsvariable.
+
+Bei *Nicht vollständig verriegelt* erscheint immer das rote Warnsymbol, auch wenn eigene Bilder hinterlegt sind.
 
 ### 6. Visualisierung
 

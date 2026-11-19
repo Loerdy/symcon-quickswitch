@@ -10,6 +10,8 @@ use PHPUnit\Framework\TestCase;
 abstract class QuickLockTestCase extends TestCase
 {
     protected const MODULE = '{1C6242D2-94AD-03EB-F761-EED556D56353}';
+    protected const PNG = "\x89PNG\r\n\x1A\n" . 'png-test-data';
+    protected const JPEG = "\xFF\xD8\xFF\xE0" . 'jpeg-test-data';
 
     // Darstellungen der Aktionsvariablen wie bei den Nuki-Schlössern
     protected const HANDLE_OPTIONS = [
@@ -70,6 +72,14 @@ abstract class QuickLockTestCase extends TestCase
         return $id;
     }
 
+    protected function createImage(string $content): int
+    {
+        $id = IPS_CreateMedia(MEDIATYPE_IMAGE);
+        IPS_SetMediaFile($id, 'media/test_' . $id . '.png', false);
+        IPS_SetMediaContent($id, base64_encode($content));
+        return $id;
+    }
+
     protected function entry(int $statusID, int $actionID, array $overrides = []): array
     {
         return array_merge([
@@ -77,6 +87,9 @@ abstract class QuickLockTestCase extends TestCase
             'actionVariable' => $actionID,
             'label'          => '',
             'showLabel'      => true,
+            'imageLocked'    => 0,
+            'imageUnlocked'  => 0,
+            'imageUnlatched' => 0,
             'confirmOpen'    => true,
             'confirmUnlock'  => false
         ], $overrides);
@@ -102,7 +115,7 @@ abstract class QuickLockTestCase extends TestCase
 
     protected function state(QuickLock $module): array
     {
-        return $this->call($module, 'buildState');
+        return $this->call($module, 'buildFullState');
     }
 
     protected function commandValues(array $tile): array
