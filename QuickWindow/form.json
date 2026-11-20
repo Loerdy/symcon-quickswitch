@@ -102,12 +102,12 @@
         },
         {
             "type": "ExpansionPanel",
-            "caption": "Window handles (arrow menu)",
+            "caption": "Window handles and locks",
             "items": [
                 {
                     "type": "List",
                     "name": "Handles",
-                    "caption": "Window handles",
+                    "caption": "Window handles and locks",
                     "rowCount": 6,
                     "add": true,
                     "delete": true,
@@ -126,7 +126,26 @@
                             }
                         },
                         {
-                            "caption": "Handle position (door state)",
+                            "caption": "Handle type",
+                            "name": "handleType",
+                            "width": "230px",
+                            "add": "doorState",
+                            "edit": {
+                                "type": "Select",
+                                "options": [
+                                    {
+                                        "caption": "Matter door state (e.g. Siegenia)",
+                                        "value": "doorState"
+                                    },
+                                    {
+                                        "caption": "Homematic rotary handle",
+                                        "value": "homematic"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "caption": "Handle position (optional)",
                             "name": "positionVariable",
                             "width": "240px",
                             "add": 0,
@@ -172,7 +191,7 @@
                             }
                         },
                         {
-                            "caption": "Confirm open",
+                            "caption": "Confirm unlock",
                             "name": "confirmOpen",
                             "width": "140px",
                             "add": false,
@@ -184,11 +203,15 @@
                 },
                 {
                     "type": "Label",
-                    "caption": "Handle position: Matter attribute DoorLock_DoorState (0 = open, 1 = closed, 2 = jammed, 3 = forced open, 4 = unknown error, 5 = tilted). Lock state: DoorLock_LockState, lock action: DoorLock_LockUnlockUnbolt (0 = open, 2 = lock). Leave both lock variables empty for handles without motor."
+                    "caption": "Handle type Matter door state: DoorLock_DoorState (0 = open, 1 = closed, 2 = jammed, 3 = forced open, 4 = unknown error, 5 = tilted). Handle type Homematic rotary handle: STATE (0 = closed, 1 = tilted, 2 = open). Lock state: DoorLock_LockState, lock action: DoorLock_LockUnlockUnbolt (0 = open, 1 = unlock, 2 = lock)."
                 },
                 {
                     "type": "Label",
-                    "caption": "Windows and doors with handles get a small arrow; tapping opens a menu with the handle positions and the lock commands. Lock is only offered while the handle reports closed. Without a label, the name of the device (parent instance of the handle position) is used."
+                    "caption": "Each entry needs a handle position, a lock (state and action) or both. Handles without motor: leave both lock variables empty. Door locks without handle (e.g. Nuki): leave the handle position empty; they can only be locked while the contact is closed. Handles with motor can only be locked while the handle reports closed."
+                },
+                {
+                    "type": "Label",
+                    "caption": "Each entry is shown at the bottom of the button: the handle as an arrow in its direction (down = closed, right = open, up = tilted) and the lock as a button that locks or unlocks directly. Tapping the button opens a menu with all details. A closed window or door with locks turns green when all are locked and red when one is unlocked. Without a label, the name of the device (parent instance) is used."
                 }
             ]
         },
@@ -218,7 +241,7 @@
         {
             "code": 203,
             "icon": "error",
-            "caption": "At least one window handle is invalid (window/door not in the list, variable missing, not Integer, only one lock variable set or lock action without action). See the debug output."
+            "caption": "At least one window handle or lock is invalid (window/door not in the list, variable missing, not Integer, neither handle position nor lock, only one lock variable set or lock action without action). See the debug output."
         }
     ]
 }

@@ -132,7 +132,8 @@ class QuickWindowTest extends TestCase
         // [Kontakt offen, Griff links, Griff rechts, Verriegelung links, Verriegelung rechts] => Zustand
         $cases = [
             [false, 1, 1, 1, 1, 'locked'],
-            [false, 1, 1, 1, 2, 'closed'],
+            [false, 1, 1, 1, 2, 'unlocked'],
+            [false, 1, 1, 3, 2, 'unlocked'],
             [false, 1, 1, 0, 1, 'fault'],
             [false, 1, 2, 2, 2, 'fault'],
             [true, 1, 1, 2, 2, 'open'],
@@ -160,7 +161,7 @@ class QuickWindowTest extends TestCase
 
         $this->assertSame('closed', $opening['state']);
         $this->assertFalse($opening['handles'][0]['lockable']);
-        $this->assertSame(['open' => null, 'lock' => null], $opening['handles'][0]['commands']);
+        $this->assertSame(['unlock' => null, 'open' => null, 'lock' => null], $opening['handles'][0]['commands']);
     }
 
     public function testHandleTextsAndCommandsComeFromPresentations(): void
@@ -176,7 +177,8 @@ class QuickWindowTest extends TestCase
 
         $this->assertSame('Flügel links', $handle['label']);
         $this->assertSame(['tilted', 'Gekippt (Siegenia)', 'Unlocked'], [$handle['positionState'], $handle['positionText'], $handle['lockText']]);
-        $this->assertSame(['caption' => 'Öffnen', 'icon' => 'unlock', 'color' => ''], $handle['commands']['open']);
+        $this->assertSame(['value' => 0, 'caption' => 'Öffnen', 'icon' => 'unlock', 'color' => ''], $handle['commands']['unlock']);
+        $this->assertNull($handle['commands']['open']);
         $this->assertSame('Verriegeln', $handle['commands']['lock']['caption']);
     }
 
@@ -316,12 +318,78 @@ class QuickWindowTest extends TestCase
         $this->assertSame([], $GLOBALS['QWN_COMMANDS']);
     }
 
+    public function testHomematicHandlePositions(): void
+    {
+        $contact = $this->createContact(false);
+        $position = $this->createInteger(0);
+        $module = $this->create([$this->opening($contact)], [$this->handle($contact, $position, 0, 0, ['handleType' => 'homematic'])]);
+
+        $expected = [0 => ['closed', 'closed', 'Closed'], 1 => ['tilted', 'tilted', 'Tilted'], 2 => ['open', 'open', 'Open'], 3 => ['fault', 'fault', 'Unknown']];
+        foreach ($expected as $value => [$opening, $handle, $text]) {
+            SetValue($position, $value);
+            $tile = $this->state($module)['openings'][0];
+            $this->assertSame([$opening, $handle, $text], [$tile['state'], $tile['handles'][0]['positionState'], $tile['handles'][0]['positionText']], 'Wert ' . $value);
+        }
+    }
+
+    public function testDoorLockWithoutHandleColorsDoorAndRespectsContact(): void
+    {
+        $contact = $this->createContact(false);
+        $lockStatus = $this->createInteger(2, 'Verriegelungsstatus');
+        $lockAction = $this->createLockAction();
+        $module = $this->create([$this->opening($contact, ['kind' => 'door'])], [$this->handle($contact, 0, $lockStatus, $lockAction)]);
+
+        $this->assertSame(IS_ACTIVE, $this->instanceStatus($module));
+        $door = $this->state($module)['openings'][0];
+        $this->assertSame(['unlocked', 'door-closed', 'Unlocked'], [$door['state'], $door['icon'], $door['text']]);
+        $this->assertFalse($door['handles'][0]['hasPosition']);
+        $this->assertTrue($door['handles'][0]['lockAllowed']);
+
+        // Offene Tür: nicht verriegeln.
+        SetValue($contact, true);
+        $this->assertFalse($this->state($module)['openings'][0]['handles'][0]['lockAllowed']);
+        $module->RequestAction('Lock', $lockAction);
+        $this->assertSame([], $GLOBALS['QWN_COMMANDS']);
+
+        SetValue($contact, false);
+        $module->RequestAction('Toggle', $lockAction);
+        $this->assertSame([[$lockAction, 2]], $GLOBALS['QWN_COMMANDS']);
+        SetValue($lockStatus, 1);
+        $this->assertSame('locked', $this->state($module)['openings'][0]['state']);
+    }
+
+    public function testToggleUnlocksWithUnlockCommandWhenOffered(): void
+    {
+        $contact = $this->createContact(false);
+        $knob = [
+            ['Value' => 0, 'Caption' => 'Öffnen'],
+            ['Value' => 1, 'Caption' => 'Entriegeln'],
+            ['Value' => 2, 'Caption' => 'Verriegeln']
+        ];
+        $knobStatus = $this->createInteger(1);
+        $knobAction = $this->createLockAction(true, $knob);
+        [$position, $handleStatus, $handleAction] = $this->siegenia(1, 1);
+        $module = $this->create([$this->opening($contact, ['kind' => 'door'])], [
+            $this->handle($contact, 0, $knobStatus, $knobAction),
+            $this->handle($contact, $position, $handleStatus, $handleAction)
+        ]);
+
+        $module->RequestAction('Toggle', $knobAction);
+        $module->RequestAction('Toggle', $handleAction);
+        $module->RequestAction('Unlock', $handleAction);
+
+        // Knauf: Entriegeln (1); Siegenia ohne Entriegeln: Öffnen (0); Entriegeln wird dort nicht angeboten.
+        $this->assertSame([[$knobAction, 1], [$handleAction, 0]], $GLOBALS['QWN_COMMANDS']);
+        $commands = $this->state($module)['openings'][0]['handles'][0]['commands'];
+        $this->assertSame([1, 0, 2], [$commands['unlock']['value'], $commands['open']['value'], $commands['lock']['value']]);
+    }
+
     public function testUnknownActionThrows(): void
     {
         $module = $this->create([]);
 
         $this->expectException(Exception::class);
-        $module->RequestAction('Toggle', 0);
+        $module->RequestAction('Unknown', 0);
     }
 
     public function testTileContainsEscapedInitialState(): void
@@ -356,10 +424,10 @@ class QuickWindowTest extends TestCase
         return $id;
     }
 
-    private function createLockAction(bool $withAction = true): int
+    private function createLockAction(bool $withAction = true, array $options = self::LOCK_OPTIONS): int
     {
         $id = $this->createInteger(2, 'Türschloss');
-        IPS_SetVariableCustomPresentation($id, ['PRESENTATION' => VARIABLE_PRESENTATION_ENUMERATION, 'OPTIONS' => json_encode(self::LOCK_OPTIONS)]);
+        IPS_SetVariableCustomPresentation($id, ['PRESENTATION' => VARIABLE_PRESENTATION_ENUMERATION, 'OPTIONS' => json_encode($options)]);
         if ($withAction) {
             IPS_SetVariableCustomAction($id, $this->actionScript);
         }

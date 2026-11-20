@@ -15,13 +15,15 @@ class QuickWindow extends IPSModule
         'door'   => ['closed' => 'door-closed', 'open' => 'door-open', 'tilted' => 'door-open']
     ];
 
-    // Werte der Griffstellung (Matter DoorLock_DoorState)
-    private const POSITION_OPEN = 0;
-    private const POSITION_CLOSED = 1;
-    private const POSITION_JAMMED = 2;
-    private const POSITION_FORCED = 3;
-    private const POSITION_ERROR = 4;
-    private const POSITION_TILTED = 5;
+    // Griffarten: Werte der Griffstellung => Zustand
+    private const HANDLE_TYPE_DOOR_STATE = 'doorState';
+    private const HANDLE_TYPE_HOMEMATIC = 'homematic';
+    private const POSITION_STATES = [
+        // Matter DoorLock_DoorState (z. B. Siegenia): 0 geöffnet, 1 geschlossen, 2 blockiert, 3 gewaltsam geöffnet, 4 unbekannter Fehler, 5 gekippt
+        self::HANDLE_TYPE_DOOR_STATE => [0 => 'open', 1 => 'closed', 2 => 'fault', 3 => 'forced', 4 => 'fault', 5 => 'tilted'],
+        // Homematic Drehgriffkontakt (STATE): 0 geschlossen, 1 gekippt, 2 offen
+        self::HANDLE_TYPE_HOMEMATIC => [0 => 'closed', 1 => 'tilted', 2 => 'open']
+    ];
 
     // Werte des Verriegelungsstatus (Matter DoorLock_LockState)
     private const LOCK_NOT_FULLY_LOCKED = 0;
@@ -29,10 +31,11 @@ class QuickWindow extends IPSModule
     private const LOCK_UNLOCKED = 2;
     private const LOCK_UNLATCHED = 3;
 
-    // Werte der Aktionsvariable (Matter DoorLock_LockUnlockUnbolt); die Griffe bieten nur Öffnen und Verriegeln.
+    // Werte der Aktionsvariable (Matter DoorLock_LockUnlockUnbolt)
     private const COMMAND_OPEN = 0;
+    private const COMMAND_UNLOCK = 1;
     private const COMMAND_LOCK = 2;
-    private const COMMAND_IDENTS = ['Open' => self::COMMAND_OPEN, 'Lock' => self::COMMAND_LOCK];
+    private const COMMAND_IDENTS = ['Open' => self::COMMAND_OPEN, 'Unlock' => self::COMMAND_UNLOCK, 'Lock' => self::COMMAND_LOCK];
 
     private const STATUS_INVALID_OPENING = 201;
     private const STATUS_INVALID_LIST = 202;
@@ -108,9 +111,13 @@ class QuickWindow extends IPSModule
 
     public function RequestAction($Ident, $Value): void
     {
-        if ($Ident === 'LockAll') {
-            $this->lockAll((int) $Value);
-            return;
+        switch ($Ident) {
+            case 'LockAll':
+                $this->lockAll((int) $Value);
+                return;
+            case 'Toggle':
+                $this->toggleLock((int) $Value);
+                return;
         }
         if (array_key_exists($Ident, self::COMMAND_IDENTS)) {
             $this->sendCommand((int) $Value, self::COMMAND_IDENTS[$Ident]);
@@ -155,7 +162,9 @@ class QuickWindow extends IPSModule
     }
 
     /**
-     * @return array<int, array{contactVariableId: int, positionVariableId: int, lockStatusVariableId: int, lockActionVariableId: int, label: string, confirmOpen: bool}>|null null bei unlesbarer Liste
+     * Griffe und Schlösser: Griffstellung und Verriegelung sind jeweils optional, mindestens eines von beiden ist gesetzt.
+     *
+     * @return array<int, array{contactVariableId: int, handleType: string, positionVariableId: int, lockStatusVariableId: int, lockActionVariableId: int, label: string, confirmOpen: bool}>|null null bei unlesbarer Liste
      */
     private function readHandles(): ?array
     {
@@ -172,6 +181,7 @@ class QuickWindow extends IPSModule
             }
             $handles[] = [
                 'contactVariableId'    => is_int($row['contactVariable'] ?? null) ? $row['contactVariable'] : 0,
+                'handleType'           => ($row['handleType'] ?? '') === self::HANDLE_TYPE_HOMEMATIC ? self::HANDLE_TYPE_HOMEMATIC : self::HANDLE_TYPE_DOOR_STATE,
                 'positionVariableId'   => is_int($row['positionVariable'] ?? null) ? $row['positionVariable'] : 0,
                 'lockStatusVariableId' => is_int($row['lockStatusVariable'] ?? null) ? $row['lockStatusVariable'] : 0,
                 'lockActionVariableId' => is_int($row['lockActionVariable'] ?? null) ? $row['lockActionVariable'] : 0,
@@ -194,7 +204,12 @@ class QuickWindow extends IPSModule
         return $this->isVariableOfType($opening['contactVariableId'], VARIABLETYPE_BOOLEAN);
     }
 
-    // Griff mit Verriegelung: Status- und Aktionsvariable sind beide gesetzt (beide leer = nur Griffstellung).
+    private function hasPosition(array $handle): bool
+    {
+        return $handle['positionVariableId'] > 0;
+    }
+
+    // Eintrag mit Verriegelung: Status- oder Aktionsvariable gesetzt (gültig nur mit beiden).
     private function isLockable(array $handle): bool
     {
         return $handle['lockStatusVariableId'] > 0 || $handle['lockActionVariableId'] > 0;
@@ -202,8 +217,13 @@ class QuickWindow extends IPSModule
 
     private function isValidHandle(array $handle, array $openings): bool
     {
-        if (!in_array($handle['contactVariableId'], array_column($openings, 'contactVariableId'), true)
-            || !$this->isVariableOfType($handle['positionVariableId'], VARIABLETYPE_INTEGER)) {
+        if (!in_array($handle['contactVariableId'], array_column($openings, 'contactVariableId'), true)) {
+            return false;
+        }
+        if (!$this->hasPosition($handle) && !$this->isLockable($handle)) {
+            return false;
+        }
+        if ($this->hasPosition($handle) && !$this->isVariableOfType($handle['positionVariableId'], VARIABLETYPE_INTEGER)) {
             return false;
         }
         if (!$this->isLockable($handle)) {
@@ -230,7 +250,7 @@ class QuickWindow extends IPSModule
         }
         foreach ($handles as $handle) {
             if (!$this->isValidHandle($handle, $openings)) {
-                $this->SendDebug('Handles', 'Ungültiger Griff mit Griffstellung ' . $handle['positionVariableId'] . ' für Kontakt ' . $handle['contactVariableId'], 0);
+                $this->SendDebug('Handles', 'Ungültiger Griff/Schloss (Griffstellung ' . $handle['positionVariableId'] . ', Aktion ' . $handle['lockActionVariableId'] . ') für Kontakt ' . $handle['contactVariableId'], 0);
                 return self::STATUS_INVALID_HANDLE;
             }
         }
@@ -277,7 +297,7 @@ class QuickWindow extends IPSModule
     }
 
     /**
-     * Gültige Griffe je Öffnung (Kontaktvariable), in der Reihenfolge der Liste.
+     * Griffe je Öffnung (Kontaktvariable), in der Reihenfolge der Liste.
      *
      * @return array<int, array<int, array>>
      */
@@ -290,36 +310,60 @@ class QuickWindow extends IPSModule
         return $result;
     }
 
+    private function findOpening(int $contactVariableId): ?array
+    {
+        foreach ($this->readOpenings() ?? [] as $opening) {
+            if ($opening['contactVariableId'] === $contactVariableId) {
+                return $opening;
+            }
+        }
+        return null;
+    }
+
     // --------- Befehle ---------
 
     /**
-     * Befehle der Aktionsvariable mit Beschriftung, Icon und Farbe aus ihrer Darstellung; ohne Darstellung eigene Texte.
+     * Befehle, die die Aktionsvariable laut Darstellung anbietet, mit Beschriftung, Icon und Farbe. Ohne lesbare
+     * Darstellung gelten Öffnen und Verriegeln (wie bei QuickLock).
      *
      * @return array<int, array{caption: string, icon: string, color: string}>
      */
     private function commandOptions(int $actionVariableId): array
     {
-        $commands = [
-            self::COMMAND_OPEN => ['caption' => $this->Translate('Open (command)'), 'icon' => 'lock-open', 'color' => ''],
-            self::COMMAND_LOCK => ['caption' => $this->Translate('Lock'), 'icon' => 'lock', 'color' => '']
+        $defaults = [
+            self::COMMAND_OPEN   => ['caption' => $this->Translate('Open (command)'), 'icon' => 'lock-open', 'color' => ''],
+            self::COMMAND_UNLOCK => ['caption' => $this->Translate('Unlock'), 'icon' => 'lock-open', 'color' => ''],
+            self::COMMAND_LOCK   => ['caption' => $this->Translate('Lock'), 'icon' => 'lock', 'color' => '']
         ];
-        $seen = [];
+        $commands = [];
         foreach ($this->enumerationOptions($actionVariableId) as $option) {
             $value = (int) $option['value'];
-            if (!isset($commands[$value]) || isset($seen[$value])) {
+            if (!isset($defaults[$value]) || isset($commands[$value])) {
                 continue;
             }
-            $seen[$value] = true;
             $commands[$value] = [
-                'caption' => $option['caption'] !== '' ? $option['caption'] : $commands[$value]['caption'],
-                'icon'    => $option['icon'] !== '' ? $option['icon'] : $commands[$value]['icon'],
+                'caption' => $option['caption'] !== '' ? $option['caption'] : $defaults[$value]['caption'],
+                'icon'    => $option['icon'] !== '' ? $option['icon'] : $defaults[$value]['icon'],
                 'color'   => $option['color']
             ];
         }
+        if (!isset($commands[self::COMMAND_LOCK])) {
+            $commands[self::COMMAND_LOCK] = $defaults[self::COMMAND_LOCK];
+        }
+        if (!isset($commands[self::COMMAND_OPEN]) && !isset($commands[self::COMMAND_UNLOCK])) {
+            $commands[self::COMMAND_OPEN] = $defaults[self::COMMAND_OPEN];
+        }
+        ksort($commands);
         return $commands;
     }
 
-    // Gültiger Griff mit Verriegelung, der zu dieser Instanz gehört
+    // Aufschließen: Entriegeln, wenn angeboten (Schloss mit Knauf), sonst Öffnen.
+    private function unlockCommand(array $commands): int
+    {
+        return isset($commands[self::COMMAND_UNLOCK]) ? self::COMMAND_UNLOCK : self::COMMAND_OPEN;
+    }
+
+    // Gültiger Eintrag mit Verriegelung, der zu dieser Instanz gehört
     private function findLockableHandle(int $lockActionVariableId): ?array
     {
         $openings = $this->readOpenings() ?? [];
@@ -331,16 +375,45 @@ class QuickWindow extends IPSModule
         return null;
     }
 
+    /**
+     * Verriegeln ist nur bei geschlossenem Griff erlaubt; ein Schloss ohne Griffstellung (z. B. Türschloss) nur bei
+     * geschlossenem Kontakt.
+     */
+    private function lockAllowed(array $handle, ?array $opening): bool
+    {
+        if ($this->hasPosition($handle)) {
+            return $this->positionState($handle['handleType'], GetValueInteger($handle['positionVariableId'])) === 'closed';
+        }
+        return $opening !== null && $this->isValidOpening($opening) && !$this->contactOpen($opening);
+    }
+
+    private function toggleLock(int $lockActionVariableId): void
+    {
+        $handle = $this->findLockableHandle($lockActionVariableId);
+        if ($handle === null) {
+            $this->SendDebug('Toggle', 'Schloss ist nicht verknüpft oder ungültig: ' . $lockActionVariableId, 0);
+            return;
+        }
+        $command = GetValueInteger($handle['lockStatusVariableId']) === self::LOCK_LOCKED
+            ? $this->unlockCommand($this->commandOptions($lockActionVariableId))
+            : self::COMMAND_LOCK;
+        $this->sendCommand($lockActionVariableId, $command);
+    }
+
     private function sendCommand(int $lockActionVariableId, int $command): bool
     {
         $handle = $this->findLockableHandle($lockActionVariableId);
         if ($handle === null) {
-            $this->SendDebug('Command', 'Griff ist nicht verknüpft, ohne Verriegelung oder ungültig: ' . $lockActionVariableId, 0);
+            $this->SendDebug('Command', 'Schloss ist nicht verknüpft, ohne Verriegelung oder ungültig: ' . $lockActionVariableId, 0);
             return false;
         }
-        // Ein Stellmotor soll einen offenen oder gekippten Flügel nicht verriegeln.
-        if ($command === self::COMMAND_LOCK && GetValueInteger($handle['positionVariableId']) !== self::POSITION_CLOSED) {
-            $this->SendDebug('Command', 'Verriegeln abgelehnt, Griff ' . $handle['positionVariableId'] . ' ist nicht geschlossen', 0);
+        if (!isset($this->commandOptions($lockActionVariableId)[$command])) {
+            $this->SendDebug('Command', 'Befehl ' . $command . ' wird von ' . $lockActionVariableId . ' nicht angeboten', 0);
+            return false;
+        }
+        // Ein Stellmotor soll einen offenen oder gekippten Flügel bzw. eine offene Tür nicht verriegeln.
+        if ($command === self::COMMAND_LOCK && !$this->lockAllowed($handle, $this->findOpening($handle['contactVariableId']))) {
+            $this->SendDebug('Command', 'Verriegeln abgelehnt, Griff bzw. Kontakt ist nicht geschlossen: ' . $lockActionVariableId, 0);
             $this->sendToTile(['type' => 'failed', 'id' => $lockActionVariableId]);
             return false;
         }
@@ -360,11 +433,17 @@ class QuickWindow extends IPSModule
         return true;
     }
 
-    // Verriegelt alle geschlossenen, noch nicht verriegelten Griffe einer Öffnung; ein Fehler stoppt die übrigen nicht.
+    // Verriegelt alle verriegelbaren, noch nicht verriegelten Einträge einer Öffnung; ein Fehler stoppt die übrigen nicht.
     private function lockAll(int $contactVariableId): void
     {
         $openings = $this->readOpenings() ?? [];
-        if (!in_array($contactVariableId, array_column($openings, 'contactVariableId'), true)) {
+        $opening = null;
+        foreach ($openings as $candidate) {
+            if ($candidate['contactVariableId'] === $contactVariableId) {
+                $opening = $candidate;
+            }
+        }
+        if ($opening === null) {
             $this->SendDebug('LockAll', 'Öffnung ist nicht verknüpft: ' . $contactVariableId, 0);
             return;
         }
@@ -372,13 +451,18 @@ class QuickWindow extends IPSModule
             if ($handle['contactVariableId'] !== $contactVariableId || !$this->isLockable($handle) || !$this->isValidHandle($handle, $openings)) {
                 continue;
             }
-            if (GetValueInteger($handle['positionVariableId']) === self::POSITION_CLOSED && GetValueInteger($handle['lockStatusVariableId']) !== self::LOCK_LOCKED) {
+            if ($this->lockAllowed($handle, $opening) && GetValueInteger($handle['lockStatusVariableId']) !== self::LOCK_LOCKED) {
                 $this->sendCommand($handle['lockActionVariableId'], self::COMMAND_LOCK);
             }
         }
     }
 
     // --------- Zustände ---------
+
+    private function contactOpen(array $opening): bool
+    {
+        return GetValueBoolean($opening['contactVariableId']) !== $opening['invert'];
+    }
 
     private function formattedText(int $variableId, int $value, string $fallback): string
     {
@@ -391,27 +475,27 @@ class QuickWindow extends IPSModule
         return $formatted !== '' && $formatted !== '-' && $formatted !== (string) $value ? $formatted : $fallback;
     }
 
-    private function positionState(int $position): string
+    private function positionState(string $handleType, int $position): string
     {
-        return match ($position) {
-            self::POSITION_OPEN   => 'open',
-            self::POSITION_CLOSED => 'closed',
-            self::POSITION_TILTED => 'tilted',
-            self::POSITION_FORCED => 'forced',
-            default               => 'fault'
-        };
+        return self::POSITION_STATES[$handleType][$position] ?? 'fault';
     }
 
-    private function positionFallbackText(int $position): string
+    private function positionFallbackText(string $handleType, int $position): string
     {
-        return match ($position) {
-            self::POSITION_OPEN   => $this->Translate('Open'),
-            self::POSITION_CLOSED => $this->Translate('Closed'),
-            self::POSITION_JAMMED => $this->Translate('Jammed'),
-            self::POSITION_FORCED => $this->Translate('Forced open'),
-            self::POSITION_ERROR  => $this->Translate('Unknown error'),
-            self::POSITION_TILTED => $this->Translate('Tilted'),
-            default               => $this->Translate('Unknown')
+        if ($handleType === self::HANDLE_TYPE_DOOR_STATE) {
+            if ($position === 2) {
+                return $this->Translate('Jammed');
+            }
+            if ($position === 4) {
+                return $this->Translate('Unknown error');
+            }
+        }
+        return match ($this->positionState($handleType, $position)) {
+            'open'   => $this->Translate('Open'),
+            'closed' => $this->Translate('Closed'),
+            'tilted' => $this->Translate('Tilted'),
+            'forced' => $this->Translate('Forced open'),
+            default  => $this->Translate('Unknown')
         };
     }
 
@@ -426,37 +510,43 @@ class QuickWindow extends IPSModule
         };
     }
 
-    // Veränderlicher Teil eines Griffs
-    private function handleState(array $handle, bool $valid): array
+    // Veränderlicher Teil eines Griffs bzw. Schlosses
+    private function handleState(array $handle, bool $valid, ?array $opening): array
     {
         $state = [
-            'id'            => $handle['positionVariableId'],
+            'id'            => $handle['positionVariableId'] > 0 ? $handle['positionVariableId'] : $handle['lockActionVariableId'],
             'available'     => $valid,
+            'hasPosition'   => $this->hasPosition($handle),
             'position'      => null,
             'positionState' => 'unknown',
             'positionText'  => '',
             'lockable'      => $valid && $this->isLockable($handle),
             'lockStatus'    => null,
-            'lockText'      => ''
+            'lockText'      => '',
+            'lockAllowed'   => false
         ];
         if (!$valid) {
             return $state;
         }
-        $position = GetValueInteger($handle['positionVariableId']);
-        $state['position'] = $position;
-        $state['positionState'] = $this->positionState($position);
-        $state['positionText'] = $this->formattedText($handle['positionVariableId'], $position, $this->positionFallbackText($position));
+        if ($state['hasPosition']) {
+            $position = GetValueInteger($handle['positionVariableId']);
+            $state['position'] = $position;
+            $state['positionState'] = $this->positionState($handle['handleType'], $position);
+            $state['positionText'] = $this->formattedText($handle['positionVariableId'], $position, $this->positionFallbackText($handle['handleType'], $position));
+        }
         if ($state['lockable']) {
             $lockStatus = GetValueInteger($handle['lockStatusVariableId']);
             $state['lockStatus'] = $lockStatus;
             $state['lockText'] = $this->formattedText($handle['lockStatusVariableId'], $lockStatus, $this->lockFallbackText($lockStatus));
+            $state['lockAllowed'] = $this->lockAllowed($handle, $opening);
         }
         return $state;
     }
 
     /**
-     * Gesamtzustand einer Öffnung aus Kontakt und Griffen; es gilt der auffälligste Zustand:
-     * gewaltsam geöffnet > offen > gekippt > Störung > geschlossen > verriegelt (alle Griffe mit Motor verriegelt).
+     * Gesamtzustand einer Öffnung aus Kontakt, Griffen und Schlössern; es gilt der auffälligste Zustand:
+     * gewaltsam geöffnet > offen > gekippt > Störung > entriegelt > geschlossen bzw. verriegelt.
+     * Mit Schlössern ist eine geschlossene Öffnung verriegelt (alle verriegelt) oder entriegelt (mindestens eines offen).
      */
     private function openingStatus(bool $contactOpen, array $handleStates): string
     {
@@ -466,7 +556,9 @@ class QuickWindow extends IPSModule
             if ($handle['available'] !== true) {
                 continue;
             }
-            $positions[] = $handle['positionState'];
+            if ($handle['hasPosition']) {
+                $positions[] = $handle['positionState'];
+            }
             if ($handle['lockable']) {
                 $locks[] = $handle['lockStatus'];
             }
@@ -486,35 +578,41 @@ class QuickWindow extends IPSModule
         if (in_array('fault', $positions, true) || in_array(self::LOCK_NOT_FULLY_LOCKED, $locks, true)) {
             return 'fault';
         }
-        if ($locks !== [] && count(array_filter($locks, static fn ($lock) => $lock === self::LOCK_LOCKED)) === count($locks)) {
-            return 'locked';
+        if ($locks === []) {
+            return 'closed';
         }
-        return 'closed';
+        foreach ($locks as $lock) {
+            if ($lock !== self::LOCK_LOCKED) {
+                return 'unlocked';
+            }
+        }
+        return 'locked';
     }
 
     private function openingText(string $status): string
     {
         return match ($status) {
-            'forced' => $this->Translate('Forced open'),
-            'open'   => $this->Translate('Open'),
-            'tilted' => $this->Translate('Tilted'),
-            'fault'  => $this->Translate('Fault'),
-            'closed' => $this->Translate('Closed'),
-            'locked' => $this->Translate('Locked'),
-            default  => $this->Translate('Unknown')
+            'forced'   => $this->Translate('Forced open'),
+            'open'     => $this->Translate('Open'),
+            'tilted'   => $this->Translate('Tilted'),
+            'fault'    => $this->Translate('Fault'),
+            'unlocked' => $this->Translate('Unlocked'),
+            'closed'   => $this->Translate('Closed'),
+            'locked'   => $this->Translate('Locked'),
+            default    => $this->Translate('Unknown')
         };
     }
 
     private function openingIcon(array $opening, string $status): string
     {
+        if (in_array($status, ['forced', 'fault'], true)) {
+            return 'triangle-exclamation';
+        }
         $key = match ($status) {
             'open'   => 'open',
             'tilted' => 'tilted',
             default  => 'closed'
         };
-        if (in_array($status, ['forced', 'fault'], true)) {
-            return 'triangle-exclamation';
-        }
         if ($opening['icons'][$key] !== '') {
             return $opening['icons'][$key];
         }
@@ -525,13 +623,13 @@ class QuickWindow extends IPSModule
         return self::DEFAULT_ICONS[$opening['kind']][$key];
     }
 
-    // Veränderlicher Teil einer Öffnung mit ihren Griffen
+    // Veränderlicher Teil einer Öffnung mit ihren Griffen und Schlössern
     private function openingState(array $opening, array $handles, array $openings): array
     {
         $valid = $this->isValidOpening($opening);
         $handleStates = [];
         foreach ($handles as $handle) {
-            $handleStates[] = $this->handleState($handle, $valid && $this->isValidHandle($handle, $openings));
+            $handleStates[] = $this->handleState($handle, $valid && $this->isValidHandle($handle, $openings), $opening);
         }
         $state = [
             'available' => $valid,
@@ -543,8 +641,7 @@ class QuickWindow extends IPSModule
         if (!$valid) {
             return $state;
         }
-        $contactOpen = GetValueBoolean($opening['contactVariableId']) !== $opening['invert'];
-        $status = $this->openingStatus($contactOpen, $handleStates);
+        $status = $this->openingStatus($this->contactOpen($opening), $handleStates);
         return array_merge($state, [
             'state' => $status,
             'text'  => $this->openingText($status),
@@ -554,20 +651,15 @@ class QuickWindow extends IPSModule
 
     private function summaryText(array $openingStates): string
     {
-        $counts = ['open' => 0, 'tilted' => 0, 'fault' => 0];
+        $counts = ['open' => 0, 'tilted' => 0, 'unlocked' => 0, 'fault' => 0];
         $available = 0;
         foreach ($openingStates as $state) {
             if ($state['available'] !== true) {
                 continue;
             }
             $available++;
-            $key = match ($state['state']) {
-                'open', 'forced' => 'open',
-                'tilted'         => 'tilted',
-                'fault'          => 'fault',
-                default          => ''
-            };
-            if ($key !== '') {
+            $key = $state['state'] === 'forced' ? 'open' : $state['state'];
+            if (isset($counts[$key])) {
                 $counts[$key]++;
             }
         }
@@ -580,6 +672,9 @@ class QuickWindow extends IPSModule
         }
         if ($counts['tilted'] > 0) {
             $parts[] = sprintf($this->Translate('%d tilted'), $counts['tilted']);
+        }
+        if ($counts['unlocked'] > 0) {
+            $parts[] = sprintf($this->Translate('%d unlocked'), $counts['unlocked']);
         }
         if ($counts['fault'] > 0) {
             $parts[] = sprintf($this->Translate($counts['fault'] === 1 ? '%d fault' : '%d faults'), $counts['fault']);
@@ -609,6 +704,11 @@ class QuickWindow extends IPSModule
         return $states;
     }
 
+    private function commandForTile(array $commands, int $value): ?array
+    {
+        return isset($commands[$value]) ? ['value' => $value] + $commands[$value] : null;
+    }
+
     private function buildFullState(): array
     {
         $openings = $this->readOpenings() ?? [];
@@ -625,13 +725,16 @@ class QuickWindow extends IPSModule
             $tile['showLabel'] = $opening['showLabel'];
             foreach ($byOpening[$opening['contactVariableId']] ?? [] as $handleIndex => $handle) {
                 $commands = $tile['handles'][$handleIndex]['lockable'] ? $this->commandOptions($handle['lockActionVariableId']) : [];
+                $unlock = $commands !== [] ? $this->unlockCommand($commands) : null;
                 $tile['handles'][$handleIndex] += [
-                    'label'       => $handle['label'] !== '' ? $handle['label'] : $this->defaultLabel($handle['positionVariableId']),
+                    'label'       => $handle['label'] !== '' ? $handle['label'] : $this->defaultLabel($handle['positionVariableId'] > 0 ? $handle['positionVariableId'] : $handle['lockActionVariableId']),
                     'lockId'      => $handle['lockActionVariableId'],
                     'confirmOpen' => $handle['confirmOpen'],
                     'commands'    => [
-                        'open' => $commands[self::COMMAND_OPEN] ?? null,
-                        'lock' => $commands[self::COMMAND_LOCK] ?? null
+                        'unlock' => $unlock !== null ? $this->commandForTile($commands, $unlock) : null,
+                        // Öffnen zusätzlich, wenn es neben Entriegeln angeboten wird (Falle ziehen)
+                        'open'   => $unlock === self::COMMAND_UNLOCK ? $this->commandForTile($commands, self::COMMAND_OPEN) : null,
+                        'lock'   => $this->commandForTile($commands, self::COMMAND_LOCK)
                     ]
                 ];
             }

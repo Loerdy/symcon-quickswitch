@@ -22,6 +22,15 @@
         box-sizing: border-box;
     }
 
+    /* Feste Zustandsfarben */
+    :root {
+        --color-open: #F0A30A;
+        --color-tilted: #0EA5E9;
+        --color-alert: #E5484D;
+        --color-locked: #30A46C;
+        --color-neutral: color-mix(in srgb, var(--content-color, CanvasText) 55%, transparent);
+    }
+
     /* Zusammenfassung über dem Raster */
     .summary {
         flex: 0 0 auto;
@@ -39,7 +48,7 @@
     }
 
     .summary[data-alert="true"] {
-        color: #F0A30A;
+        color: var(--color-open);
     }
 
     .grid {
@@ -90,12 +99,13 @@
     }
 
     .opening:focus-visible,
-    .more:focus-visible,
+    .mini:focus-visible,
     .action:focus-visible {
         outline: none;
     }
 
     .opening:focus-visible .face,
+    .mini:focus-visible,
     .action:focus-visible {
         outline: 2px solid var(--accent-color, currentColor);
         outline-offset: -2px;
@@ -106,7 +116,6 @@
     }
 
     .face {
-        position: relative;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -120,32 +129,31 @@
         transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;
     }
 
+    /* Mit Leiste für Griffe und Schlösser bleibt unten Platz frei. */
+    .cell[data-controls="true"] .face {
+        padding-bottom: calc(var(--mini-size, 24px) + var(--size, 64px) * 0.12);
+    }
+
     .cell[data-menu="true"] .opening:hover .face {
         background: color-mix(in srgb, var(--content-color, CanvasText) 10%, transparent);
     }
 
-    /* Offen, gekippt und Störungen: Fläche in der Zustandsfarbe hinterlegt, damit es auf einen Blick auffällt. */
-    .cell[data-state="open"] .face,
-    .cell[data-state="tilted"] .face,
-    .cell[data-state="fault"] .face,
-    .cell[data-state="forced"] .face {
+    /* Auffällige Zustände: Fläche in der Zustandsfarbe hinterlegt, damit es auf einen Blick auffällt. */
+    .cell:is([data-state="open"], [data-state="tilted"], [data-state="fault"], [data-state="forced"], [data-state="unlocked"], [data-state="locked"]) .face {
         background: color-mix(in srgb, var(--state-color) 16%, transparent);
     }
 
-    .cell[data-menu="true"][data-state="open"] .opening:hover .face,
-    .cell[data-menu="true"][data-state="tilted"] .opening:hover .face,
-    .cell[data-menu="true"][data-state="fault"] .opening:hover .face,
-    .cell[data-menu="true"][data-state="forced"] .opening:hover .face {
+    .cell[data-menu="true"]:is([data-state="open"], [data-state="tilted"], [data-state="fault"], [data-state="forced"], [data-state="unlocked"], [data-state="locked"]) .opening:hover .face {
         background: color-mix(in srgb, var(--state-color) 24%, transparent);
     }
 
     .cell[data-menu="true"] .opening:active .face,
     .opening[data-pressed="true"] .face {
-        transform: scale(0.95);
+        transform: scale(0.97);
     }
 
     .cell[data-failed="true"] .face {
-        box-shadow: inset 0 0 0 2px #E5484D;
+        box-shadow: inset 0 0 0 2px var(--color-alert);
     }
 
     .graphic {
@@ -156,31 +164,33 @@
         height: 100%;
         line-height: 1;
         /* icons.js ersetzt das <i> durch ein SVG mit 1em Höhe; die Schriftgröße skaliert damit das Icon. */
-        font-size: calc(var(--size, 64px) * 0.58);
+        font-size: min(calc(var(--size, 64px) * 0.58), calc(var(--face-height, 64px) * 0.6));
         color: var(--state-color);
         transition: color 0.2s ease, opacity 0.2s ease;
     }
 
-    /* Zustandsfarben: geschlossen neutral, verriegelt in der Akzentfarbe, sonst feste Warnfarben */
+    .cell[data-controls="true"] .graphic {
+        font-size: min(calc(var(--size, 64px) * 0.52), calc((var(--face-height, 64px) - var(--mini-size, 24px)) * 0.55));
+    }
+
     .cell[data-state="closed"] {
-        --state-color: color-mix(in srgb, var(--content-color, CanvasText) 55%, transparent);
+        --state-color: var(--color-neutral);
     }
 
     .cell[data-state="locked"] {
-        --state-color: var(--accent-color, currentColor);
+        --state-color: var(--color-locked);
     }
 
     .cell[data-state="open"] {
-        --state-color: #F0A30A;
+        --state-color: var(--color-open);
     }
 
     .cell[data-state="tilted"] {
-        --state-color: #0EA5E9;
+        --state-color: var(--color-tilted);
     }
 
-    .cell[data-state="fault"],
-    .cell[data-state="forced"] {
-        --state-color: #E5484D;
+    .cell:is([data-state="fault"], [data-state="forced"], [data-state="unlocked"]) {
+        --state-color: var(--color-alert);
     }
 
     .cell[data-state="unknown"] {
@@ -191,23 +201,85 @@
         opacity: 0.45;
     }
 
-    /* Schloss-Symbol links oben, wenn alle Griffe mit Motor verriegelt sind */
-    .badge {
+    /* Leiste mit Griffen und Schlössern unten in der Fläche; nur die Schloss-Buttons fangen Klicks ab. */
+    .controls {
         position: absolute;
-        top: calc(var(--size, 64px) * 0.07);
-        left: calc(var(--size, 64px) * 0.07);
-        display: none;
-        font-size: calc(var(--size, 64px) * 0.2);
+        top: calc(var(--face-height, 64px) - var(--mini-size, 24px) - var(--size, 64px) * 0.07);
+        left: 0;
+        display: flex;
+        justify-content: center;
+        gap: calc(var(--mini-size, 24px) * 0.45);
+        width: var(--face-width, var(--size, 64px));
+        pointer-events: none;
+    }
+
+    .group {
+        display: flex;
+        gap: calc(var(--mini-size, 24px) * 0.12);
+    }
+
+    .mini {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--mini-size, 24px);
+        height: var(--mini-size, 24px);
+        padding: 0;
+        border: 0;
+        border-radius: 30%;
+        background: color-mix(in srgb, var(--mini-color, var(--content-color, CanvasText)) 18%, transparent);
+        color: var(--mini-color, inherit);
+        font: inherit;
+        font-size: calc(var(--mini-size, 24px) * 0.55);
         line-height: 1;
-        color: var(--accent-color, currentColor);
+        -webkit-tap-highlight-color: transparent;
     }
 
-    .cell[data-state="locked"] .badge {
-        display: block;
+    .mini[data-state="closed"] {
+        --mini-color: var(--color-neutral);
     }
 
-    /* Befehl gesendet, Rückmeldung des Griffs steht noch aus */
-    .cell[data-pending="true"] .graphic,
+    .mini[data-state="open"] {
+        --mini-color: var(--color-open);
+    }
+
+    .mini[data-state="tilted"] {
+        --mini-color: var(--color-tilted);
+    }
+
+    .mini:is([data-state="fault"], [data-state="forced"], [data-state="unlocked"]) {
+        --mini-color: var(--color-alert);
+    }
+
+    .mini[data-state="locked"] {
+        --mini-color: var(--color-locked);
+    }
+
+    .mini[data-state="unknown"] {
+        --mini-color: var(--disabled-color, currentColor);
+        opacity: 0.5;
+    }
+
+    button.mini {
+        pointer-events: auto;
+        cursor: pointer;
+    }
+
+    button.mini:hover {
+        background: color-mix(in srgb, var(--mini-color, var(--content-color, CanvasText)) 30%, transparent);
+    }
+
+    button.mini:disabled {
+        cursor: default;
+        opacity: 0.55;
+    }
+
+    .mini[data-failed="true"] {
+        box-shadow: inset 0 0 0 2px var(--color-alert);
+    }
+
+    /* Befehl gesendet, Rückmeldung des Schlosses steht noch aus */
+    .mini[data-pending="true"],
     .handle-row[data-pending="true"] .action {
         animation: pending 1.1s ease-in-out infinite;
     }
@@ -238,45 +310,9 @@
         opacity: 0.7;
     }
 
-    .cell[data-state="open"] .status-text,
-    .cell[data-state="tilted"] .status-text,
-    .cell[data-state="fault"] .status-text,
-    .cell[data-state="forced"] .status-text {
+    .cell:is([data-state="open"], [data-state="tilted"], [data-state="fault"], [data-state="forced"], [data-state="unlocked"]) .status-text {
         color: var(--state-color);
         opacity: 1;
-    }
-
-    /* Pfeil zum Griff-Menü, rechts unten in der Fläche */
-    .more {
-        position: absolute;
-        top: calc(var(--face-height, var(--size, 64px)) - var(--more-size, 24px) - var(--size, 64px) * 0.05);
-        right: calc(var(--size, 64px) * 0.05);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: var(--more-size, 24px);
-        height: var(--more-size, 24px);
-        padding: 0;
-        border: 0;
-        border-radius: 50%;
-        background: color-mix(in srgb, var(--content-color, CanvasText) 12%, transparent);
-        color: inherit;
-        cursor: pointer;
-        -webkit-tap-highlight-color: transparent;
-    }
-
-    .more:hover,
-    .more:focus-visible {
-        background: color-mix(in srgb, var(--content-color, CanvasText) 22%, transparent);
-    }
-
-    .more:disabled {
-        display: none;
-    }
-
-    .more svg {
-        width: 60%;
-        height: 60%;
     }
 
     .empty {
@@ -332,7 +368,7 @@
     .handle-row {
         display: flex;
         align-items: center;
-        gap: 0.6em;
+        gap: 0.5em;
         padding: 0.3em 0.3em 0.3em 0.7em;
         border-radius: 0.8em;
         background: color-mix(in srgb, var(--content-color, CanvasText) 6%, transparent);
@@ -340,7 +376,7 @@
     }
 
     .handle-row[data-failed="true"] {
-        box-shadow: inset 0 0 0 2px #E5484D;
+        box-shadow: inset 0 0 0 2px var(--color-alert);
     }
 
     .handle-row[data-available="false"] {
@@ -367,7 +403,7 @@
     }
 
     .handle-state[data-alert="true"] {
-        color: #F0A30A;
+        color: var(--color-open);
         opacity: 1;
     }
 
@@ -435,17 +471,21 @@
     const overlayHandles = document.getElementById("overlay-handles");
     const overlayActions = document.getElementById("overlay-actions");
 
-    // Werte der Griffstellung (Matter DoorLock_DoorState) und des Verriegelungsstatus (DoorLock_LockState)
-    const POSITION_CLOSED = 1;
+    // Werte des Verriegelungsstatus (Matter DoorLock_LockState) und Aktionen des Moduls je Befehlswert
+    const LOCK_NOT_FULLY_LOCKED = 0;
     const LOCK_LOCKED = 1;
+    const COMMAND_IDENTS = { 0: "Open", 1: "Unlock", 2: "Lock" };
     // Spätestens dann gilt ein gesendeter Befehl als abgeschlossen, auch ohne Rückmeldung.
     const PENDING_TIMEOUT = 30000;
     const DEFAULT_ICON = { window: "window-frame", door: "door-closed" };
+    // Griff als Pfeil in seiner Richtung: unten = geschlossen, waagerecht = offen, oben = gekippt
+    const POSITION_ICONS = { closed: "arrow-down", open: "arrow-right", tilted: "arrow-up", fault: "triangle-exclamation", forced: "triangle-exclamation" };
+    const ALERT_STATES = ["open", "tilted", "fault", "forced", "unlocked"];
 
     let state = { type: "full", showStatus: false, showSummary: false, summary: "", openings: [] };
     // Index der Öffnung => Elemente der Zelle
     let items = [];
-    // Aktionsvariable eines Griffs => { lockStatus, timer } eines gesendeten Befehls
+    // Aktionsvariable eines Schlosses => { lockStatus, timer } eines gesendeten Befehls
     const pendingById = new Map();
     const failedIds = new Set();
     // Offenes Overlay: { index, mode: "menu" | "confirm" }
@@ -465,27 +505,29 @@
         return icon;
     }
 
-    function chevronElement() {
-        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        svg.setAttribute("viewBox", "0 0 24 24");
-        svg.setAttribute("aria-hidden", "true");
-        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute("d", "M6 9l6 6 6-6");
-        path.setAttribute("fill", "none");
-        path.setAttribute("stroke", "currentColor");
-        path.setAttribute("stroke-width", "2.5");
-        path.setAttribute("stroke-linecap", "round");
-        path.setAttribute("stroke-linejoin", "round");
-        svg.append(path);
-        return svg;
+    // Icon nur bei Änderung austauschen (icons.js ersetzt das <i> durch ein SVG).
+    function setIcon(element, name, fallback) {
+        const icon = validIcon(name, fallback);
+        if (element.dataset.icon !== icon) {
+            element.dataset.icon = icon;
+            element.replaceChildren(iconElement(icon, fallback));
+        }
     }
 
     function handlesOf(opening) {
         return Array.isArray(opening.handles) ? opening.handles : [];
     }
 
+    function isLockable(handle) {
+        return handle.available === true && handle.lockable === true;
+    }
+
     function canLock(handle) {
-        return handle.available === true && handle.lockable === true && handle.position === POSITION_CLOSED && handle.lockStatus !== LOCK_LOCKED;
+        return isLockable(handle) && handle.lockAllowed === true && handle.lockStatus !== LOCK_LOCKED;
+    }
+
+    function controlCount(opening) {
+        return handlesOf(opening).reduce((sum, handle) => sum + (handle.hasPosition === true ? 1 : 0) + (handle.lockable === true ? 1 : 0), 0);
     }
 
     // Maße der Beschriftungszeilen unter der Fläche; wachsen mit der Schaltfläche, höchstens etwas über die Designschrift.
@@ -523,10 +565,16 @@
         const size = Math.max(0, Math.floor(best.size) - 1);
         const label = labelMetrics(size, lines);
         const rowHeight = (height - (best.rows - 1) * gap) / best.rows;
-        const faceHeight = Math.max(size, Math.min(Math.floor(rowHeight - label.height - label.gap) - 1, Math.round(size * 1.3)));
+        // Begrenzt die Breite die Größe, füllen die Schaltflächen die Höhe (höchstens doppelt so hoch wie breit).
+        const faceHeight = Math.max(size, Math.min(Math.floor(rowHeight - label.height - label.gap) - 1, size * 2));
         // Begrenzt die Höhe die Größe, füllen die Schaltflächen die Breite (höchstens 60 % breiter als hoch).
         const columnWidth = (width - (best.columns - 1) * gap) / best.columns;
         const faceWidth = Math.max(size, Math.min(Math.floor(columnWidth) - 1, Math.round(faceHeight * 1.6)));
+        // Leiste: alle Griffe und Schlösser der vollsten Schaltfläche passen nebeneinander in die Fläche.
+        const controls = Number(grid.dataset.controls) || 0;
+        const groups = Number(grid.dataset.groups) || 1;
+        const fit = controls > 0 ? (faceWidth * 0.9) / (controls + 0.12 * (controls - groups) + 0.45 * (groups - 1)) : 0;
+        const mini = Math.round(Math.max(16, Math.min(44, size * 0.3, fit)));
         grid.style.setProperty("--gap", gap + "px");
         grid.style.setProperty("--columns", String(best.columns));
         grid.style.setProperty("--size", size + "px");
@@ -535,7 +583,7 @@
         grid.style.setProperty("--label-size", label.fontSize + "px");
         grid.style.setProperty("--line-height", label.lineHeight + "px");
         grid.style.setProperty("--label-gap", label.gap + "px");
-        grid.style.setProperty("--more-size", Math.round(Math.max(22, Math.min(36, size * 0.26))) + "px");
+        grid.style.setProperty("--mini-size", mini + "px");
     }
 
     function pressFeedback(button) {
@@ -545,22 +593,17 @@
 
     // --------- Befehle ---------
 
-    // Öffnung, zu der ein Griff (Aktionsvariable) gehört
+    // Öffnung, zu der ein Schloss (Aktionsvariable) gehört
     function itemOfLock(lockId) {
         return items.find((item) => handlesOf(item.opening).some((handle) => handle.lockId === lockId)) || null;
     }
 
-    function refreshPending(item) {
+    function refreshControls(item) {
         if (!item) {
             return;
         }
-        const pending = handlesOf(item.opening).some((handle) => pendingById.has(handle.lockId));
-        if (pending) {
-            item.cell.dataset.pending = "true";
-        } else {
-            delete item.cell.dataset.pending;
-        }
-        item.cell.setAttribute("aria-busy", String(pending));
+        item.controls.forEach((control) => applyControlState(control));
+        item.cell.setAttribute("aria-busy", String(handlesOf(item.opening).some((handle) => pendingById.has(handle.lockId))));
     }
 
     function clearPending(lockId) {
@@ -569,7 +612,7 @@
             window.clearTimeout(pending.timer);
             pendingById.delete(lockId);
         }
-        refreshPending(itemOfLock(lockId));
+        refreshControls(itemOfLock(lockId));
         refreshOverlay();
     }
 
@@ -577,7 +620,7 @@
         clearPending(handle.lockId);
         const timer = window.setTimeout(() => clearPending(handle.lockId), PENDING_TIMEOUT);
         pendingById.set(handle.lockId, { lockStatus: handle.lockStatus, timer });
-        refreshPending(itemOfLock(handle.lockId));
+        refreshControls(itemOfLock(handle.lockId));
         refreshOverlay();
     }
 
@@ -589,34 +632,46 @@
         }
         failedIds.add(lockId);
         item.cell.dataset.failed = "true";
+        refreshControls(item);
         refreshOverlay();
         window.setTimeout(() => {
             failedIds.delete(lockId);
             delete item.cell.dataset.failed;
+            refreshControls(item);
             refreshOverlay();
         }, 2500);
     }
 
-    function sendCommand(handle, ident) {
-        requestAction(ident, Number(handle.lockId));
-        // Ist der Griff schon im Zielzustand, kommt keine Statusänderung; dann nichts als laufend anzeigen.
-        if (!(ident === "Lock" && handle.lockStatus === LOCK_LOCKED)) {
+    function sendCommand(handle, command) {
+        requestAction(COMMAND_IDENTS[command.value], Number(handle.lockId));
+        // Ist das Schloss schon im Zielzustand, kommt keine Statusänderung; dann nichts als laufend anzeigen.
+        if (!(command.value === 2 && handle.lockStatus === LOCK_LOCKED)) {
             setPending(handle);
         }
     }
 
-    function runCommand(item, handle, ident) {
-        if (handle.available !== true || handle.lockable !== true) {
+    // Aufschließen bzw. Öffnen ggf. mit Rückfrage; Verriegeln nur, wenn erlaubt.
+    function runCommand(item, handle, command, returnToMenu) {
+        if (!command || !isLockable(handle)) {
             return;
         }
-        if (ident === "Lock" && !canLock(handle)) {
+        if (command.value === 2) {
+            if (canLock(handle)) {
+                sendCommand(handle, command);
+            }
             return;
         }
-        if (ident === "Open" && handle.confirmOpen === true) {
-            showConfirmation(item, handle);
+        if (handle.confirmOpen === true) {
+            showConfirmation(item, handle, command, returnToMenu);
         } else {
-            sendCommand(handle, ident);
+            sendCommand(handle, command);
         }
+    }
+
+    // Schloss-Button in der Leiste: verriegelt => aufschließen, sonst verriegeln
+    function toggleLock(item, handle) {
+        const commands = handle.commands || {};
+        runCommand(item, handle, handle.lockStatus === LOCK_LOCKED ? commands.unlock : commands.lock, false);
     }
 
     function lockAll(item) {
@@ -626,6 +681,76 @@
         }
         requestAction("LockAll", Number(item.opening.id));
         handles.forEach(setPending);
+    }
+
+    // --------- Leiste mit Griffen und Schlössern ---------
+
+    function lockState(handle) {
+        if (!isLockable(handle)) {
+            return "unknown";
+        }
+        if (handle.lockStatus === LOCK_LOCKED) {
+            return "locked";
+        }
+        return handle.lockStatus === LOCK_NOT_FULLY_LOCKED ? "fault" : "unlocked";
+    }
+
+    function applyControlState(control) {
+        const { element, handle, kind } = control;
+        const available = handle.available === true;
+        if (kind === "position") {
+            const positionState = available ? String(handle.positionState || "unknown") : "unknown";
+            element.dataset.state = positionState;
+            setIcon(element, POSITION_ICONS[positionState] || "question", "question");
+            element.title = String(handle.label || "") + (available ? " – " + String(handle.positionText || "") : "");
+            return;
+        }
+        const stateName = lockState(handle);
+        element.dataset.state = stateName;
+        setIcon(element, stateName === "locked" ? "lock" : stateName === "unlocked" ? "lock-open" : "lock", "lock");
+        element.disabled = !isLockable(handle) || (handle.lockStatus !== LOCK_LOCKED && !canLock(handle));
+        if (pendingById.has(handle.lockId)) {
+            element.dataset.pending = "true";
+        } else {
+            delete element.dataset.pending;
+        }
+        if (failedIds.has(handle.lockId)) {
+            element.dataset.failed = "true";
+        } else {
+            delete element.dataset.failed;
+        }
+        const hint = element.disabled && isLockable(handle) ? " – " + translate("Close the handle to lock") : "";
+        const title = String(handle.label || "") + (available ? " – " + String(handle.lockText || "") : "") + hint;
+        element.title = title;
+        element.setAttribute("aria-label", title);
+    }
+
+    function buildControls(item) {
+        const container = document.createElement("div");
+        container.className = "controls";
+        handlesOf(item.opening).forEach((handle) => {
+            const group = document.createElement("span");
+            group.className = "group";
+            if (handle.hasPosition === true) {
+                const indicator = document.createElement("span");
+                indicator.className = "mini";
+                indicator.setAttribute("aria-hidden", "true");
+                group.append(indicator);
+                item.controls.push({ element: indicator, handle, kind: "position" });
+            }
+            if (handle.lockable === true) {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "mini";
+                button.addEventListener("click", () => toggleLock(item, handle));
+                group.append(button);
+                item.controls.push({ element: button, handle, kind: "lock" });
+            }
+            if (group.childElementCount > 0) {
+                container.append(group);
+            }
+        });
+        return container;
     }
 
     // --------- Menü und Rückfrage ---------
@@ -657,7 +782,7 @@
         return button;
     }
 
-    // Zeile eines Griffs: Name, Griffstellung und Verriegelung, rechts der passende Befehl
+    // Zeile eines Griffs bzw. Schlosses: Name, Griffstellung und Verriegelung, rechts die passenden Befehle
     function handleRow(item, handle) {
         const row = document.createElement("div");
         row.className = "handle-row";
@@ -677,25 +802,31 @@
         details.className = "handle-state";
         const texts = handle.available === true ? [handle.positionText, handle.lockText].filter((text) => typeof text === "string" && text !== "") : [translate("Not available")];
         details.textContent = texts.join(" · ");
-        details.dataset.alert = String(handle.available === true && handle.positionState !== "closed");
+        details.dataset.alert = String(handle.available === true && ((handle.hasPosition === true && handle.positionState !== "closed") || (handle.lockable === true && handle.lockStatus !== LOCK_LOCKED)));
         info.append(name, details);
         row.append(info);
 
-        if (handle.available === true && handle.lockable === true) {
+        if (isLockable(handle)) {
             const commands = handle.commands || {};
-            let button;
             if (handle.lockStatus === LOCK_LOCKED) {
-                button = actionButton(commands.open, translate("Open (command)"), "lock-open");
-                button.addEventListener("click", () => runCommand(item, handle, "Open"));
+                const unlock = actionButton(commands.unlock, translate("Unlock"), "lock-open");
+                unlock.addEventListener("click", () => runCommand(item, handle, commands.unlock, true));
+                row.append(unlock);
             } else {
-                button = actionButton(commands.lock, translate("Lock"), "lock");
-                button.disabled = !canLock(handle);
-                if (button.disabled) {
-                    button.title = translate("Close the handle to lock");
+                const lock = actionButton(commands.lock, translate("Lock"), "lock");
+                lock.disabled = !canLock(handle);
+                if (lock.disabled) {
+                    lock.title = translate("Close the handle to lock");
                 }
-                button.addEventListener("click", () => runCommand(item, handle, "Lock"));
+                lock.addEventListener("click", () => runCommand(item, handle, commands.lock, true));
+                row.append(lock);
             }
-            row.append(button);
+            // Schlösser mit Entriegeln und Öffnen: Öffnen (Falle ziehen) zusätzlich anbieten
+            if (commands.open) {
+                const open = actionButton(commands.open, translate("Open (command)"), "door-open");
+                open.addEventListener("click", () => runCommand(item, handle, commands.open, true));
+                row.append(open);
+            }
         }
         return row;
     }
@@ -720,15 +851,14 @@
         overlayText.hidden = false;
         overlayHandles.replaceChildren(...handlesOf(opening).map((handle) => handleRow(item, handle)));
         const buttons = [];
-        const lockable = handlesOf(opening).filter((handle) => handle.available === true && handle.lockable === true);
+        const lockable = handlesOf(opening).filter(isLockable);
         if (lockable.length > 1) {
             const all = actionButton(null, translate("Lock all"), "lock");
             all.disabled = !lockable.some(canLock);
             all.addEventListener("click", () => lockAll(item));
             buttons.push(all);
         }
-        const cancel = cancelButton();
-        overlayActions.replaceChildren(...buttons, cancel);
+        overlayActions.replaceChildren(...buttons, cancelButton());
         overlay.setAttribute("aria-label", String(opening.label || ""));
     }
 
@@ -745,18 +875,20 @@
         }
     }
 
-    function showConfirmation(item, handle) {
+    function showConfirmation(item, handle, command, returnToMenu) {
         overlayView = { index: item.index, mode: "confirm" };
-        const command = (handle.commands || {}).open;
-        const caption = command && command.caption ? String(command.caption) : translate("Open (command)");
-        overlayTitle.textContent = String(item.opening.label || "") + " – " + String(handle.label || "");
-        overlayText.textContent = caption + "?";
+        overlayTitle.textContent = String(item.opening.label || "") + (handle.label ? " – " + String(handle.label) : "");
+        overlayText.textContent = String(command.caption || "") + "?";
         overlayText.hidden = false;
         overlayHandles.replaceChildren();
-        const button = actionButton(command, translate("Open (command)"), "lock-open");
+        const button = actionButton(command, String(command.caption || ""), "lock-open");
         button.addEventListener("click", () => {
-            sendCommand(handle, "Open");
-            showMenu(item);
+            sendCommand(handle, command);
+            if (returnToMenu) {
+                showMenu(item);
+            } else {
+                closeOverlay();
+            }
         });
         overlayActions.replaceChildren(button, cancelButton());
         showOverlay();
@@ -794,23 +926,15 @@
         const show = state.showSummary === true && typeof text === "string" && text !== "";
         summary.hidden = !show;
         summary.textContent = show ? text : "";
-        summary.dataset.alert = String(items.some(({ opening }) => opening.available === true && ["open", "tilted", "fault", "forced"].includes(opening.state)));
+        summary.dataset.alert = String(items.some(({ opening }) => opening.available === true && ALERT_STATES.includes(opening.state)));
     }
 
-    // Zustand einer Öffnung anzeigen; das Icon nur bei Änderung austauschen (icons.js ersetzt das <i> durch ein SVG).
     function applyOpeningState(item) {
-        const { cell, button, more, graphic, statusLabel, opening } = item;
+        const { cell, button, graphic, statusLabel, opening } = item;
         const available = opening.available === true;
         cell.dataset.state = available && typeof opening.state === "string" ? opening.state : "unknown";
         button.disabled = !available;
-        if (more) {
-            more.disabled = !available;
-        }
-        const icon = validIcon(opening.icon, DEFAULT_ICON[opening.kind] || DEFAULT_ICON.window);
-        if (graphic.dataset.icon !== icon) {
-            graphic.dataset.icon = icon;
-            graphic.replaceChildren(iconElement(icon, "window-frame"));
-        }
+        setIcon(graphic, opening.icon, DEFAULT_ICON[opening.kind] || DEFAULT_ICON.window);
         const text = available ? String(opening.text || "") : translate("Not available");
         if (statusLabel) {
             statusLabel.textContent = text;
@@ -818,6 +942,7 @@
         const title = String(opening.label || "") + (text !== "" ? " – " + text : "");
         button.title = title;
         button.setAttribute("aria-label", title);
+        refreshControls(item);
     }
 
     function renderFull() {
@@ -828,6 +953,10 @@
         items = [];
         grid.dataset.count = String(openings.length);
         grid.dataset.lines = String((openings.some((opening) => opening.showLabel !== false) ? 1 : 0) + (showStatus ? 1 : 0));
+        // Die Leiste richtet sich nach der Schaltfläche mit den meisten Griffen und Schlössern.
+        const fullest = openings.reduce((best, opening) => (controlCount(opening) > controlCount(best) ? opening : best), {});
+        grid.dataset.controls = String(controlCount(fullest));
+        grid.dataset.groups = String(Math.max(1, handlesOf(fullest).filter((handle) => handle.hasPosition === true || handle.lockable === true).length));
         layoutGrid();
 
         if (openings.length === 0) {
@@ -849,10 +978,7 @@
             face.className = "face";
             const graphic = document.createElement("span");
             graphic.className = "graphic";
-            const badge = document.createElement("span");
-            badge.className = "badge";
-            badge.append(iconElement("lock", "lock"));
-            face.append(graphic, badge);
+            face.append(graphic);
             button.append(face);
             if (opening.showLabel !== false) {
                 const label = document.createElement("span");
@@ -868,22 +994,15 @@
             }
             cell.append(button);
 
-            let more = null;
+            const item = { index, cell, button, graphic, statusLabel, opening, controls: [] };
             if (handlesOf(opening).length > 0) {
                 cell.dataset.menu = "true";
                 button.setAttribute("aria-haspopup", "dialog");
-                more = document.createElement("button");
-                more.type = "button";
-                more.className = "more";
-                more.title = translate("Window handles");
-                more.setAttribute("aria-label", translate("Window handles"));
-                more.setAttribute("aria-haspopup", "dialog");
-                more.append(chevronElement());
-                more.addEventListener("click", () => showMenu(item));
-                cell.append(more);
             }
-
-            const item = { index, cell, button, more, graphic, statusLabel, opening };
+            if (controlCount(opening) > 0) {
+                cell.dataset.controls = "true";
+                cell.append(buildControls(item));
+            }
             button.addEventListener("click", () => {
                 if (cell.dataset.menu === "true") {
                     pressFeedback(button);
@@ -892,7 +1011,6 @@
             });
             applyOpeningState(item);
             items.push(item);
-            refreshPending(item);
             grid.append(cell);
         });
         applySummary(state.summary);
@@ -913,7 +1031,7 @@
                 if (!next || next.id !== handle.id) {
                     return;
                 }
-                ["available", "position", "positionState", "positionText", "lockable", "lockStatus", "lockText"].forEach((key) => (handle[key] = next[key]));
+                ["available", "hasPosition", "position", "positionState", "positionText", "lockable", "lockStatus", "lockText", "lockAllowed"].forEach((key) => (handle[key] = next[key]));
                 const pending = pendingById.get(handle.lockId);
                 if (pending && (handle.lockStatus !== pending.lockStatus || handle.available !== true)) {
                     window.clearTimeout(pending.timer);
@@ -921,10 +1039,9 @@
                 }
             });
             applyOpeningState(item);
-            refreshPending(item);
         });
-        applySummary(message.summary);
         state.summary = message.summary;
+        applySummary(message.summary);
         refreshOverlay();
     }
 
