@@ -31,6 +31,7 @@
             "Off": "Aus",
             "More settings": "Weitere Einstellungen",
             "Close": "Schließen",
+            "The tile template could not be loaded.": "Die Kachel-Vorlage konnte nicht geladen werden.",
             "Unknown action: %s": "Unbekannte Aktion: %s",
             "Switching variable %d failed.": "Schalten der Variable %d ist fehlgeschlagen.",
             "All on": "Alle an",

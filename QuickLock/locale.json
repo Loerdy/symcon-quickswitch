@@ -37,7 +37,7 @@
             "Not available": "Nicht verfügbar",
             "More commands": "Weitere Befehle",
             "Cancel": "Abbrechen",
-            "Command failed": "Befehl fehlgeschlagen"
+            "The tile template could not be loaded.": "Die Kachel-Vorlage konnte nicht geladen werden."
         }
     }
 }

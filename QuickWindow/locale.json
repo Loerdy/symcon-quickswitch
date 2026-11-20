@@ -55,7 +55,8 @@
             "No windows or doors configured": "Keine Fenster oder Türen konfiguriert",
             "Not available": "Nicht verfügbar",
             "Close the handle to lock": "Zum Verriegeln Griff bzw. Tür schließen",
-            "Cancel": "Abbrechen"
+            "Cancel": "Abbrechen",
+            "The tile template could not be loaded.": "Die Kachel-Vorlage konnte nicht geladen werden."
         }
     }
 }

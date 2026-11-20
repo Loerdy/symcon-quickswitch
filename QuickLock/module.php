@@ -87,6 +87,7 @@ class QuickLock extends IPSModule
         $template = @file_get_contents(__DIR__ . '/module.html');
         if (!is_string($template)) {
             $this->SendDebug('Visualization', 'HTML-Vorlage konnte nicht geladen werden', 0);
+            $this->LogMessage($this->Translate('The tile template could not be loaded.'), KL_ERROR);
             return '';
         }
 
