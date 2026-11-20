@@ -1,0 +1,14 @@
+{
+    "id": "{31D4FBBC-4F6B-7E50-5575-DA01D3B76D6D}",
+    "name": "QuickWindow",
+    "type": 3,
+    "vendor": "",
+    "aliases": [
+        "Quick Window"
+    ],
+    "url": "https://github.com/Loerdy/symcon-quickswitch/blob/main/QuickWindow/README.md",
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "QWN"
+}

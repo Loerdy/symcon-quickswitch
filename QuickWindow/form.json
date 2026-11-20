@@ -1,0 +1,224 @@
+{
+    "elements": [
+        {
+            "type": "List",
+            "name": "Openings",
+            "caption": "Windows and doors",
+            "rowCount": 8,
+            "add": true,
+            "delete": true,
+            "changeOrder": true,
+            "columns": [
+                {
+                    "caption": "Contact variable (reed contact)",
+                    "name": "contactVariable",
+                    "width": "260px",
+                    "add": 0,
+                    "edit": {
+                        "type": "SelectVariable",
+                        "validVariableTypes": [
+                            0
+                        ]
+                    }
+                },
+                {
+                    "caption": "Inverted (true = closed)",
+                    "name": "invert",
+                    "width": "190px",
+                    "add": false,
+                    "edit": {
+                        "type": "CheckBox"
+                    }
+                },
+                {
+                    "caption": "Type",
+                    "name": "kind",
+                    "width": "120px",
+                    "add": "window",
+                    "edit": {
+                        "type": "Select",
+                        "options": [
+                            {
+                                "caption": "Window",
+                                "value": "window"
+                            },
+                            {
+                                "caption": "Door",
+                                "value": "door"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "caption": "Label (optional)",
+                    "name": "label",
+                    "width": "auto",
+                    "add": "",
+                    "edit": {
+                        "type": "ValidationTextBox"
+                    }
+                },
+                {
+                    "caption": "Show label",
+                    "name": "showLabel",
+                    "width": "130px",
+                    "add": true,
+                    "edit": {
+                        "type": "CheckBox"
+                    }
+                },
+                {
+                    "caption": "Icon closed",
+                    "name": "iconClosed",
+                    "width": "160px",
+                    "add": "",
+                    "edit": {
+                        "type": "SelectIcon"
+                    }
+                },
+                {
+                    "caption": "Icon open",
+                    "name": "iconOpen",
+                    "width": "160px",
+                    "add": "",
+                    "edit": {
+                        "type": "SelectIcon"
+                    }
+                },
+                {
+                    "caption": "Icon tilted",
+                    "name": "iconTilted",
+                    "width": "160px",
+                    "add": "",
+                    "edit": {
+                        "type": "SelectIcon"
+                    }
+                }
+            ]
+        },
+        {
+            "type": "Label",
+            "caption": "Contact variable: Boolean variable of the reed contact, true = open. Enable Inverted for contacts that report true = closed (e.g. many Matter contact sensors). Without a label, the name of the device (parent instance) is used. Empty icons = default icon of the type."
+        },
+        {
+            "type": "ExpansionPanel",
+            "caption": "Window handles (arrow menu)",
+            "items": [
+                {
+                    "type": "List",
+                    "name": "Handles",
+                    "caption": "Window handles",
+                    "rowCount": 6,
+                    "add": true,
+                    "delete": true,
+                    "changeOrder": true,
+                    "columns": [
+                        {
+                            "caption": "Window/door (contact variable from the list above)",
+                            "name": "contactVariable",
+                            "width": "300px",
+                            "add": 0,
+                            "edit": {
+                                "type": "SelectVariable",
+                                "validVariableTypes": [
+                                    0
+                                ]
+                            }
+                        },
+                        {
+                            "caption": "Handle position (door state)",
+                            "name": "positionVariable",
+                            "width": "240px",
+                            "add": 0,
+                            "edit": {
+                                "type": "SelectVariable",
+                                "validVariableTypes": [
+                                    1
+                                ]
+                            }
+                        },
+                        {
+                            "caption": "Lock state (optional)",
+                            "name": "lockStatusVariable",
+                            "width": "220px",
+                            "add": 0,
+                            "edit": {
+                                "type": "SelectVariable",
+                                "validVariableTypes": [
+                                    1
+                                ]
+                            }
+                        },
+                        {
+                            "caption": "Lock action (optional)",
+                            "name": "lockActionVariable",
+                            "width": "220px",
+                            "add": 0,
+                            "edit": {
+                                "type": "SelectVariable",
+                                "validVariableTypes": [
+                                    1
+                                ],
+                                "requiredAction": 1
+                            }
+                        },
+                        {
+                            "caption": "Label (optional)",
+                            "name": "label",
+                            "width": "auto",
+                            "add": "",
+                            "edit": {
+                                "type": "ValidationTextBox"
+                            }
+                        },
+                        {
+                            "caption": "Confirm open",
+                            "name": "confirmOpen",
+                            "width": "140px",
+                            "add": false,
+                            "edit": {
+                                "type": "CheckBox"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "Label",
+                    "caption": "Handle position: Matter attribute DoorLock_DoorState (0 = open, 1 = closed, 2 = jammed, 3 = forced open, 4 = unknown error, 5 = tilted). Lock state: DoorLock_LockState, lock action: DoorLock_LockUnlockUnbolt (0 = open, 2 = lock). Leave both lock variables empty for handles without motor."
+                },
+                {
+                    "type": "Label",
+                    "caption": "Windows and doors with handles get a small arrow; tapping opens a menu with the handle positions and the lock commands. Lock is only offered while the handle reports closed. Without a label, the name of the device (parent instance of the handle position) is used."
+                }
+            ]
+        },
+        {
+            "type": "CheckBox",
+            "name": "ShowStatus",
+            "caption": "Show state as text below the button"
+        },
+        {
+            "type": "CheckBox",
+            "name": "ShowSummary",
+            "caption": "Show summary above the buttons (e.g. \"2 open · 1 tilted\")"
+        }
+    ],
+    "actions": [],
+    "status": [
+        {
+            "code": 201,
+            "icon": "error",
+            "caption": "At least one window or door is invalid (contact variable missing or not Boolean). See the debug output."
+        },
+        {
+            "code": 202,
+            "icon": "error",
+            "caption": "The list of windows and doors or of window handles could not be read."
+        },
+        {
+            "code": 203,
+            "icon": "error",
+            "caption": "At least one window handle is invalid (window/door not in the list, variable missing, not Integer, only one lock variable set or lock action without action). See the debug output."
+        }
+    ]
+}

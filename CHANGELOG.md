@@ -23,3 +23,6 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 - QuickLock: Anzeige für laufende Befehle bis zur Rückmeldung des Schlosses sowie Hinweis bei fehlgeschlagenen Befehlen.
 - QuickLock: Eigene Icons je Zustand (leer = Icon aus der Darstellung).
 - QuickLock: Eigene Bilder (Medienobjekte) für verriegelt, entriegelt und entsperrt; Bilder werden nur bei Konfigurations- oder Medienänderungen übertragen, nicht bei jeder Statusänderung.
+- Modul **QuickWindow**: Kachel mit beliebig vielen Fenstern und Türen; Zustand (offen, gekippt, geschlossen, verriegelt, Störung, gewaltsam geöffnet) aus Reed-Kontakt (optional invertiert) und zugeordneten Fenstergriffen (Matter DoorLock, z. B. Siegenia).
+- QuickWindow: Griff-Menü mit Griffstellung und Verriegelung je Griff; Verriegeln nur bei geschlossenem Griff, Öffnen optional mit Rückfrage, „Alle verriegeln“ bei mehreren Griffen.
+- QuickWindow: Optionale Zusammenfassung über den Buttons (z. B. „2 offen · 1 gekippt“) und Zustand als Text unter dem Button.
