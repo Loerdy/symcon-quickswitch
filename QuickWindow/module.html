@@ -129,8 +129,9 @@
         transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.2s ease;
     }
 
-    /* Mit Leiste für Griffe und Schlösser bleibt unten Platz frei. */
-    .cell[data-controls="true"] .face {
+    /* Hat eine Schaltfläche eine Leiste für Griffe und Schlösser, bleibt in allen unten Platz frei,
+       damit die Icons überall gleich groß und gleich ausgerichtet sind. */
+    .grid[data-has-controls="true"] .face {
         padding-bottom: calc(var(--mini-size, 24px) + var(--size, 64px) * 0.12);
     }
 
@@ -139,11 +140,11 @@
     }
 
     /* Auffällige Zustände: Fläche in der Zustandsfarbe hinterlegt, damit es auf einen Blick auffällt. */
-    .cell:is([data-state="open"], [data-state="tilted"], [data-state="fault"], [data-state="forced"], [data-state="unlocked"], [data-state="locked"]) .face {
+    .cell:is([data-state="open"], [data-state="tilted"], [data-state="forced"], [data-state="closed"]) .face {
         background: color-mix(in srgb, var(--state-color) 16%, transparent);
     }
 
-    .cell[data-menu="true"]:is([data-state="open"], [data-state="tilted"], [data-state="fault"], [data-state="forced"], [data-state="unlocked"], [data-state="locked"]) .opening:hover .face {
+    .cell[data-menu="true"]:is([data-state="open"], [data-state="tilted"], [data-state="forced"], [data-state="closed"]) .opening:hover .face {
         background: color-mix(in srgb, var(--state-color) 24%, transparent);
     }
 
@@ -169,15 +170,11 @@
         transition: color 0.2s ease, opacity 0.2s ease;
     }
 
-    .cell[data-controls="true"] .graphic {
+    .grid[data-has-controls="true"] .graphic {
         font-size: min(calc(var(--size, 64px) * 0.52), calc((var(--face-height, 64px) - var(--mini-size, 24px)) * 0.55));
     }
 
     .cell[data-state="closed"] {
-        --state-color: var(--color-neutral);
-    }
-
-    .cell[data-state="locked"] {
         --state-color: var(--color-locked);
     }
 
@@ -189,7 +186,7 @@
         --state-color: var(--color-tilted);
     }
 
-    .cell:is([data-state="fault"], [data-state="forced"], [data-state="unlocked"]) {
+    .cell[data-state="forced"] {
         --state-color: var(--color-alert);
     }
 
@@ -310,7 +307,7 @@
         opacity: 0.7;
     }
 
-    .cell:is([data-state="open"], [data-state="tilted"], [data-state="fault"], [data-state="forced"], [data-state="unlocked"]) .status-text {
+    .cell:is([data-state="open"], [data-state="tilted"], [data-state="forced"]) .status-text {
         color: var(--state-color);
         opacity: 1;
     }
@@ -480,7 +477,7 @@
     const DEFAULT_ICON = { window: "window-frame", door: "door-closed" };
     // Griff als Pfeil in seiner Richtung: unten = geschlossen, waagerecht = offen, oben = gekippt
     const POSITION_ICONS = { closed: "arrow-down", open: "arrow-right", tilted: "arrow-up", fault: "triangle-exclamation", forced: "triangle-exclamation" };
-    const ALERT_STATES = ["open", "tilted", "fault", "forced", "unlocked"];
+    const ALERT_STATES = ["open", "tilted", "forced"];
 
     let state = { type: "full", showStatus: false, showSummary: false, summary: "", openings: [] };
     // Index der Öffnung => Elemente der Zelle
@@ -956,6 +953,7 @@
         // Die Leiste richtet sich nach der Schaltfläche mit den meisten Griffen und Schlössern.
         const fullest = openings.reduce((best, opening) => (controlCount(opening) > controlCount(best) ? opening : best), {});
         grid.dataset.controls = String(controlCount(fullest));
+        grid.dataset.hasControls = String(controlCount(fullest) > 0);
         grid.dataset.groups = String(Math.max(1, handlesOf(fullest).filter((handle) => handle.hasPosition === true || handle.lockable === true).length));
         layoutGrid();
 

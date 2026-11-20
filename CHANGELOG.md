@@ -23,9 +23,10 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/),
 - QuickLock: Anzeige für laufende Befehle bis zur Rückmeldung des Schlosses sowie Hinweis bei fehlgeschlagenen Befehlen.
 - QuickLock: Eigene Icons je Zustand (leer = Icon aus der Darstellung).
 - QuickLock: Eigene Bilder (Medienobjekte) für verriegelt, entriegelt und entsperrt; Bilder werden nur bei Konfigurations- oder Medienänderungen übertragen, nicht bei jeder Statusänderung.
-- Modul **QuickWindow**: Kachel mit beliebig vielen Fenstern und Türen; Zustand (offen, gekippt, geschlossen, verriegelt, entriegelt, Störung, gewaltsam geöffnet) aus Reed-Kontakt (optional invertiert) und zugeordneten Griffen und Schlössern.
+- Modul **QuickWindow**: Kachel mit beliebig vielen Fenstern und Türen; Zustand nach dem Reed-Kontakt (optional invertiert): geschlossen (grün) bzw. offen; bei offenem Kontakt präzisieren zugeordnete Griffe den Zustand (gekippt, gewaltsam geöffnet).
 - QuickWindow: Griffarten Matter-Türstatus (z. B. Siegenia) und Homematic-Drehgriff (0 = geschlossen, 1 = gekippt, 2 = offen); Türschlösser ohne Griff (z. B. Nuki) zuordenbar.
 - QuickWindow: Leiste unten im Button je Griff bzw. Schloss: Griffanzeige als Pfeil in Griffrichtung und Schloss-Button zum direkten Verriegeln bzw. Aufschließen (optional mit Rückfrage); Antippen des Buttons öffnet ein Menü mit allen Details und „Alle verriegeln“.
-- QuickWindow: Geschlossene Fenster und Türen mit Schlössern werden grün (alle verriegelt) bzw. rot (mindestens eines entriegelt) dargestellt. Verriegeln nur bei geschlossenem Griff bzw. bei Schlössern ohne Griff bei geschlossenem Kontakt.
+- QuickWindow: Schlösser färben nur ihren eigenen Button (grün verriegelt, rot entriegelt), nicht die Öffnung. Verriegeln nur bei geschlossenem Griff bzw. bei Schlössern ohne Griff bei geschlossenem Kontakt.
+- QuickWindow: Icons sind in allen Buttons gleich groß und gleich ausgerichtet, auch wenn nur einige eine Leiste haben.
 - QuickWindow: Schaltflächen nutzen in schmalen, hohen Kacheln die verfügbare Höhe (bis doppelt so hoch wie breit).
 - QuickWindow: Optionale Zusammenfassung über den Buttons (z. B. „2 offen · 1 gekippt“) und Zustand als Text unter dem Button.

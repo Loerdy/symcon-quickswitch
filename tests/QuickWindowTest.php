@@ -130,17 +130,18 @@ class QuickWindowTest extends TestCase
         ]);
 
         // [Kontakt offen, Griff links, Griff rechts, Verriegelung links, Verriegelung rechts] => Zustand
+        // Maßgeblich ist der Kontakt; Griffe präzisieren nur einen offenen Kontakt, Schlösser färben die Öffnung nicht.
         $cases = [
-            [false, 1, 1, 1, 1, 'locked'],
-            [false, 1, 1, 1, 2, 'unlocked'],
-            [false, 1, 1, 3, 2, 'unlocked'],
-            [false, 1, 1, 0, 1, 'fault'],
-            [false, 1, 2, 2, 2, 'fault'],
+            [false, 1, 1, 1, 1, 'closed'],
+            [false, 1, 1, 1, 2, 'closed'],
+            [false, 1, 1, 0, 1, 'closed'],
+            [false, 5, 0, 2, 2, 'closed'],
+            [false, 3, 1, 1, 1, 'closed'],
             [true, 1, 1, 2, 2, 'open'],
             [true, 5, 1, 2, 2, 'tilted'],
             [true, 5, 0, 2, 2, 'open'],
-            [false, 3, 1, 1, 1, 'forced'],
-            [false, 1, 9, 2, 2, 'fault']
+            [true, 5, 3, 2, 2, 'forced'],
+            [true, 1, 9, 2, 2, 'open']
         ];
         foreach ($cases as [$open, $left, $right, $leftLockValue, $rightLockValue, $expected]) {
             SetValue($contact, $open);
@@ -191,14 +192,13 @@ class QuickWindowTest extends TestCase
         $this->assertSame('person-walking', $this->state($module)['openings'][0]['icon']);
         SetValue($position, 5);
         $this->assertSame('person-walking', $this->state($module)['openings'][0]['icon']);
-        SetValue($contact, false);
-        SetValue($position, 1);
-        $this->assertSame('window-frame', $this->state($module)['openings'][0]['icon']);
         SetValue($position, 3);
         $this->assertSame('triangle-exclamation', $this->state($module)['openings'][0]['icon']);
+        SetValue($contact, false);
+        $this->assertSame('window-frame', $this->state($module)['openings'][0]['icon']);
     }
 
-    public function testSummaryCountsOpenTiltedAndFaults(): void
+    public function testSummaryCountsOpenAndTilted(): void
     {
         $closed = $this->createContact(false);
         $open = $this->createContact(true);
@@ -210,8 +210,9 @@ class QuickWindowTest extends TestCase
 
         $this->assertSame('1 open · 1 tilted', $this->state($module)['summary']);
         SetValue($open, false);
-        SetValue($tilted, false);
         $this->assertSame('1 tilted', $this->call($module, 'buildStates')['summary']);
+        SetValue($tilted, false);
+        $this->assertSame('All closed', $this->call($module, 'buildStates')['summary']);
     }
 
     public function testDefaultLabelUsesParentInstance(): void
@@ -248,7 +249,7 @@ class QuickWindowTest extends TestCase
         $states = $this->call($module, 'buildStates');
 
         $this->assertSame('states', $states['type']);
-        $this->assertSame('locked', $states['openings'][0]['state']);
+        $this->assertSame('closed', $states['openings'][0]['state']);
         $this->assertSame($position, $states['openings'][0]['handles'][0]['id']);
         $this->assertArrayNotHasKey('label', $states['openings'][0]);
     }
@@ -320,11 +321,12 @@ class QuickWindowTest extends TestCase
 
     public function testHomematicHandlePositions(): void
     {
-        $contact = $this->createContact(false);
+        $contact = $this->createContact(true);
         $position = $this->createInteger(0);
         $module = $this->create([$this->opening($contact)], [$this->handle($contact, $position, 0, 0, ['handleType' => 'homematic'])]);
 
-        $expected = [0 => ['closed', 'closed', 'Closed'], 1 => ['tilted', 'tilted', 'Tilted'], 2 => ['open', 'open', 'Open'], 3 => ['fault', 'fault', 'Unknown']];
+        // Kontakt offen: der Griff präzisiert den Zustand der Öffnung.
+        $expected = [0 => ['open', 'closed', 'Closed'], 1 => ['tilted', 'tilted', 'Tilted'], 2 => ['open', 'open', 'Open'], 3 => ['open', 'fault', 'Unknown']];
         foreach ($expected as $value => [$opening, $handle, $text]) {
             SetValue($position, $value);
             $tile = $this->state($module)['openings'][0];
@@ -332,7 +334,7 @@ class QuickWindowTest extends TestCase
         }
     }
 
-    public function testDoorLockWithoutHandleColorsDoorAndRespectsContact(): void
+    public function testDoorLockWithoutHandleRespectsContact(): void
     {
         $contact = $this->createContact(false);
         $lockStatus = $this->createInteger(2, 'Verriegelungsstatus');
@@ -341,7 +343,9 @@ class QuickWindowTest extends TestCase
 
         $this->assertSame(IS_ACTIVE, $this->instanceStatus($module));
         $door = $this->state($module)['openings'][0];
-        $this->assertSame(['unlocked', 'door-closed', 'Unlocked'], [$door['state'], $door['icon'], $door['text']]);
+        // Das Schloss färbt nur seinen Button; die Tür richtet sich nach dem Kontakt.
+        $this->assertSame(['closed', 'door-closed', 'Closed'], [$door['state'], $door['icon'], $door['text']]);
+        $this->assertSame([2, 'Unlocked'], [$door['handles'][0]['lockStatus'], $door['handles'][0]['lockText']]);
         $this->assertFalse($door['handles'][0]['hasPosition']);
         $this->assertTrue($door['handles'][0]['lockAllowed']);
 
@@ -355,7 +359,8 @@ class QuickWindowTest extends TestCase
         $module->RequestAction('Toggle', $lockAction);
         $this->assertSame([[$lockAction, 2]], $GLOBALS['QWN_COMMANDS']);
         SetValue($lockStatus, 1);
-        $this->assertSame('locked', $this->state($module)['openings'][0]['state']);
+        $door = $this->state($module)['openings'][0];
+        $this->assertSame(['closed', 1], [$door['state'], $door['handles'][0]['lockStatus']]);
     }
 
     public function testToggleUnlocksWithUnlockCommandWhenOffered(): void

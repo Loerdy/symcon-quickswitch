@@ -15,25 +15,24 @@ Kachel für die Kachel-Visualisierung von IP-Symcon, die den Zustand von Fenster
 ### 1. Funktionsumfang
 
 - Beliebig viele Fenster und Türen in einer Kachel, je Öffnung ein Button mit frei wählbarer Beschriftung.
-- Gesamtzustand je Öffnung aus Reed-Kontakt, Griffen und Schlössern; angezeigt wird der auffälligste Zustand:
+- Zustand je Öffnung: maßgeblich ist der Reed-Kontakt. Nur bei offenem Kontakt präzisieren die Griffe den Zustand:
 
   | Zustand | Bedingung | Darstellung |
   | --- | --- | --- |
-  | Gewaltsam geöffnet | ein Griff meldet gewaltsam geöffnet | Warnsymbol, rot |
-  | Offen | ein Griff meldet offen oder der Kontakt ist offen | Icon „offen“, orange hinterlegt |
-  | Gekippt | ein Griff meldet gekippt | Icon „gekippt“, blau hinterlegt |
-  | Störung | ein Griff meldet blockiert, unbekannten Fehler bzw. einen unbekannten Wert oder ein Schloss nicht vollständig verriegelt | Warnsymbol, rot |
-  | Entriegelt | geschlossen, aber mindestens ein Schloss entriegelt | Icon „geschlossen“, rot hinterlegt |
-  | Verriegelt | geschlossen und alle Schlösser verriegelt | Icon „geschlossen“, grün hinterlegt |
-  | Geschlossen | Kontakt zu, alle Griffe geschlossen, keine Schlösser | Icon „geschlossen“, neutral |
+  | Geschlossen | Kontakt geschlossen (unabhängig von Griffen und Schlössern) | Icon „geschlossen“, grün hinterlegt |
+  | Gewaltsam geöffnet | Kontakt offen, ein Griff meldet gewaltsam geöffnet | Warnsymbol, rot |
+  | Gekippt | Kontakt offen, ein Griff meldet gekippt, keiner offen | Icon „gekippt“, blau hinterlegt |
+  | Offen | Kontakt offen, sonst | Icon „offen“, orange hinterlegt |
 
-- Optional der Zustand als Text unter dem Button und eine Zusammenfassung über den Buttons (z. B. „2 offen · 1 gekippt · 1 entriegelt“ bzw. „Alles geschlossen“).
+  Schlösser färben die Öffnung nicht, sondern nur ihren eigenen Button in der Leiste. Störungen eines Griffs zeigt dessen Griffanzeige.
+
+- Optional der Zustand als Text unter dem Button und eine Zusammenfassung über den Buttons (z. B. „2 offen · 1 gekippt“ bzw. „Alles geschlossen“).
 - **Leiste im Button:** Je Griff bzw. Schloss erscheint unten in der Fläche
   - der **Griff** als Pfeil in seiner Richtung: unten = geschlossen, rechts = offen, oben = gekippt, Warnsymbol bei Störung;
   - das **Schloss** als Button, grün verriegelt, rot entriegelt. Antippen schließt auf (Entriegeln, wenn das Schloss es anbietet, sonst Öffnen; optional mit Rückfrage) bzw. verriegelt. Verriegeln geht nur, solange der Griff „geschlossen“ meldet; Schlösser ohne Griff (z. B. Nuki an der Haustür) nur bei geschlossenem Kontakt. Das prüft auch das Modul selbst.
 - **Menü:** Antippen des Buttons öffnet ein Menü mit einer Zeile je Griff bzw. Schloss (Griffstellung, Verriegelung, Befehle), bei Schlössern mit Entriegeln und Öffnen zusätzlich **Öffnen** (Falle ziehen). Bei mehreren Schlössern gibt es **Alle verriegeln**. Es verriegelt alle verriegelbaren, noch nicht verriegelten Schlösser; ein Fehler bei einem Schloss stoppt die übrigen nicht.
 - Nach einem Befehl pulsiert der Schloss-Button, bis das Schloss einen neuen Status meldet (höchstens 30 Sekunden). Schlägt der Befehl fehl, wird er kurz rot umrandet und eine Meldung ins Meldungsfenster geschrieben.
-- Die Schaltflächen nutzen die Kachel möglichst vollständig; in schmalen, hohen Kacheln werden sie bis doppelt so hoch wie breit.
+- Die Schaltflächen nutzen die Kachel möglichst vollständig; in schmalen, hohen Kacheln werden sie bis doppelt so hoch wie breit. Hat eine Schaltfläche eine Leiste, ist in allen Platz dafür reserviert, damit die Icons gleich groß und gleich ausgerichtet sind.
 - Öffnungen ohne Griffe und Schlösser sind reine Anzeige.
 - Zustandsänderungen werden sofort angezeigt, ohne Polling; ein offenes Menü aktualisiert sich mit.
 

@@ -544,68 +544,43 @@ class QuickWindow extends IPSModule
     }
 
     /**
-     * Gesamtzustand einer Öffnung aus Kontakt, Griffen und Schlössern; es gilt der auffälligste Zustand:
-     * gewaltsam geöffnet > offen > gekippt > Störung > entriegelt > geschlossen bzw. verriegelt.
-     * Mit Schlössern ist eine geschlossene Öffnung verriegelt (alle verriegelt) oder entriegelt (mindestens eines offen).
+     * Gesamtzustand einer Öffnung: maßgeblich ist der Reed-Kontakt. Geschlossen ist geschlossen; nur bei offenem Kontakt
+     * präzisieren die Griffe den Zustand (gewaltsam geöffnet > offen > gekippt). Schlösser zeigen ihren Zustand nur
+     * an ihren eigenen Buttons.
      */
     private function openingStatus(bool $contactOpen, array $handleStates): string
     {
-        $positions = [];
-        $locks = [];
-        foreach ($handleStates as $handle) {
-            if ($handle['available'] !== true) {
-                continue;
-            }
-            if ($handle['hasPosition']) {
-                $positions[] = $handle['positionState'];
-            }
-            if ($handle['lockable']) {
-                $locks[] = $handle['lockStatus'];
-            }
-        }
-        if (in_array('forced', $positions, true)) {
-            return 'forced';
-        }
-        if (in_array('open', $positions, true)) {
-            return 'open';
-        }
-        if (in_array('tilted', $positions, true)) {
-            return 'tilted';
-        }
-        if ($contactOpen) {
-            return 'open';
-        }
-        if (in_array('fault', $positions, true) || in_array(self::LOCK_NOT_FULLY_LOCKED, $locks, true)) {
-            return 'fault';
-        }
-        if ($locks === []) {
+        if (!$contactOpen) {
             return 'closed';
         }
-        foreach ($locks as $lock) {
-            if ($lock !== self::LOCK_LOCKED) {
-                return 'unlocked';
+        $positions = [];
+        foreach ($handleStates as $handle) {
+            if ($handle['available'] === true && $handle['hasPosition']) {
+                $positions[] = $handle['positionState'];
             }
         }
-        return 'locked';
+        foreach (['forced', 'open', 'tilted'] as $status) {
+            if (in_array($status, $positions, true)) {
+                return $status;
+            }
+        }
+        return 'open';
     }
 
     private function openingText(string $status): string
     {
         return match ($status) {
-            'forced'   => $this->Translate('Forced open'),
-            'open'     => $this->Translate('Open'),
-            'tilted'   => $this->Translate('Tilted'),
-            'fault'    => $this->Translate('Fault'),
-            'unlocked' => $this->Translate('Unlocked'),
-            'closed'   => $this->Translate('Closed'),
-            'locked'   => $this->Translate('Locked'),
-            default    => $this->Translate('Unknown')
+            'forced' => $this->Translate('Forced open'),
+            'open'   => $this->Translate('Open'),
+            'tilted' => $this->Translate('Tilted'),
+            'closed' => $this->Translate('Closed'),
+            default  => $this->Translate('Unknown')
         };
     }
 
     private function openingIcon(array $opening, string $status): string
     {
-        if (in_array($status, ['forced', 'fault'], true)) {
+        if ($status === 'forced') {
             return 'triangle-exclamation';
         }
         $key = match ($status) {
@@ -651,7 +626,7 @@ class QuickWindow extends IPSModule
 
     private function summaryText(array $openingStates): string
     {
-        $counts = ['open' => 0, 'tilted' => 0, 'unlocked' => 0, 'fault' => 0];
+        $counts = ['open' => 0, 'tilted' => 0];
         $available = 0;
         foreach ($openingStates as $state) {
             if ($state['available'] !== true) {
@@ -672,12 +647,6 @@ class QuickWindow extends IPSModule
         }
         if ($counts['tilted'] > 0) {
             $parts[] = sprintf($this->Translate('%d tilted'), $counts['tilted']);
-        }
-        if ($counts['unlocked'] > 0) {
-            $parts[] = sprintf($this->Translate('%d unlocked'), $counts['unlocked']);
-        }
-        if ($counts['fault'] > 0) {
-            $parts[] = sprintf($this->Translate($counts['fault'] === 1 ? '%d fault' : '%d faults'), $counts['fault']);
         }
         return $parts === [] ? $this->Translate('All closed') : implode(' · ', $parts);
     }

@@ -211,7 +211,7 @@
                 },
                 {
                     "type": "Label",
-                    "caption": "Each entry is shown at the bottom of the button: the handle as an arrow in its direction (down = closed, right = open, up = tilted) and the lock as a button that locks or unlocks directly. Tapping the button opens a menu with all details. A closed window or door with locks turns green when all are locked and red when one is unlocked. Without a label, the name of the device (parent instance) is used."
+                    "caption": "Each entry is shown at the bottom of the button: the handle as an arrow in its direction (down = closed, right = open, up = tilted) and the lock as a button that locks or unlocks directly. Tapping the button opens a menu with all details. The color of the button follows the contact: closed = green; while it is open, the handles show whether it is tilted. Locks only color their own button (green = locked, red = unlocked). Without a label, the name of the device (parent instance) is used."
                 }
             ]
         },
