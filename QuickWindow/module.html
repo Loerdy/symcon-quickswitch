@@ -27,8 +27,8 @@
         --color-open: #F0A30A;
         --color-tilted: #0EA5E9;
         --color-alert: #E5484D;
-        --color-locked: #30A46C;
-        --color-neutral: color-mix(in srgb, var(--content-color, CanvasText) 55%, transparent);
+        /* Normalzustand ohne Färbung, wie Aus bei QuickSwitch */
+        --color-neutral: color-mix(in srgb, var(--disabled-color, var(--content-color, CanvasText)) 45%, transparent);
     }
 
     /* Zusammenfassung über dem Raster */
@@ -139,12 +139,12 @@
         background: color-mix(in srgb, var(--content-color, CanvasText) 10%, transparent);
     }
 
-    /* Auffällige Zustände: Fläche in der Zustandsfarbe hinterlegt, damit es auf einen Blick auffällt. */
-    .cell:is([data-state="open"], [data-state="tilted"], [data-state="forced"], [data-state="closed"]) .face {
+    /* Nur ungewollte Zustände: Fläche in der Zustandsfarbe hinterlegt; geschlossen bleibt grau. */
+    .cell:is([data-state="open"], [data-state="tilted"], [data-state="forced"]) .face {
         background: color-mix(in srgb, var(--state-color) 16%, transparent);
     }
 
-    .cell[data-menu="true"]:is([data-state="open"], [data-state="tilted"], [data-state="forced"], [data-state="closed"]) .opening:hover .face {
+    .cell[data-menu="true"]:is([data-state="open"], [data-state="tilted"], [data-state="forced"]) .opening:hover .face {
         background: color-mix(in srgb, var(--state-color) 24%, transparent);
     }
 
@@ -175,7 +175,7 @@
     }
 
     .cell[data-state="closed"] {
-        --state-color: var(--color-locked);
+        --state-color: var(--color-neutral);
     }
 
     .cell[data-state="open"] {
@@ -249,7 +249,7 @@
     }
 
     .mini[data-state="locked"] {
-        --mini-color: var(--color-locked);
+        --mini-color: var(--color-neutral);
     }
 
     .mini[data-state="unknown"] {

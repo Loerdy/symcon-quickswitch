@@ -136,9 +136,10 @@
         transition: color 0.2s ease, opacity 0.2s ease;
     }
 
-    /* Zustandsfarben: aus der Darstellung (--own-color), sonst Akzentfarbe bzw. feste Warnfarben */
+    /* Zustandsfarben: verriegelt ist der Normalzustand und bleibt grau (wie Aus bei QuickSwitch); sonst Farbe aus der
+       Darstellung (--own-color) bzw. feste Warnfarben */
     .cell[data-state="locked"] {
-        --state-color: var(--own-color, var(--accent-color, currentColor));
+        --state-color: color-mix(in srgb, var(--disabled-color, var(--content-color, CanvasText)) 45%, transparent);
     }
 
     .cell[data-state="unlocked"],

@@ -19,12 +19,12 @@ Kachel für die Kachel-Visualisierung von IP-Symcon, die den Zustand von Türsch
 
   | Status | Darstellung |
   | --- | --- |
-  | Verriegelt | Icon und Farbe des Befehls „Verriegeln“ |
+  | Verriegelt | Icon des Befehls „Verriegeln“ in Grau (Normalzustand, wie Aus bei QuickSwitch) |
   | Entriegelt | Icon und Farbe des Befehls „Entriegeln“ (ohne diesen: „Öffnen“), Fläche farbig hinterlegt |
   | Entsperrt (Falle gezogen) | Icon und Farbe des Befehls „Öffnen“, Fläche farbig hinterlegt |
   | Nicht vollständig verriegelt | Warnsymbol in Rot |
 
-- **Eigene Icons und Bilder** (Medienobjekte) für verriegelt, entriegelt und entsperrt. Je Zustand gilt: eigenes Bild, sonst eigenes Icon, sonst Icon aus der Darstellung. Ohne eigenes Bild bzw. Icon für entsperrt wird das für entriegelt verwendet. Die Iconfarbe stammt immer aus der Darstellung.
+- **Eigene Icons und Bilder** (Medienobjekte) für verriegelt, entriegelt und entsperrt. Je Zustand gilt: eigenes Bild, sonst eigenes Icon, sonst Icon aus der Darstellung. Ohne eigenes Bild bzw. Icon für entsperrt wird das für entriegelt verwendet. Die Iconfarbe für entriegelt und entsperrt stammt immer aus der Darstellung; verriegelt ist immer grau.
 - **Antippen:** Ist das Schloss verriegelt, wird es aufgeschlossen (Entriegeln, bei Schlössern ohne diesen Befehl Öffnen); sonst wird es verriegelt.
 - **Pfeil:** Schlösser, die Öffnen und Entriegeln getrennt anbieten (z. B. Tür mit Knauf), erhalten einen kleinen Pfeil. Er öffnet ein Menü mit allen Befehlen.
 - **Rückfrage:** Pro Schloss einstellbar, ob Öffnen bzw. Entriegeln erst nach einer Bestätigung ausgeführt wird.
